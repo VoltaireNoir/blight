@@ -66,7 +66,6 @@ fn main() {
             [case,value] if case == "set" => set_bl(value),
             [dir] if dir == "inc" => change_bl("2", dir),
             [dir] if dir == "dec" => change_bl("2",dir),
-            [case] if case == "help" => print_help(),
             _ => print_help(),
         }
     } else {
