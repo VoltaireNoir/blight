@@ -52,10 +52,7 @@ fn get_current(device: &str) -> u16 {
 
 fn calculate_change(current: u16, max: u16, step_size: u16, dir: &str) -> u16 {
     let step: u16 = (max as f32 * (step_size as f32 / 100.0 )) as u16;
-    println!("calc step {step}");
-
     let change: u16 = if dir == "dec" {current.saturating_sub(step)} else {current.saturating_add(step)};
-    println!("pref change {change}");
 
     if change > max {
         max
@@ -71,18 +68,19 @@ fn change_bl(step_size: &str, dir: &str) {
     let current = get_current(&device);
     let max = get_max(&device);
     let change = calculate_change(current, max, step_size, dir);
-    println!("change {change}");
     if change != current {
         fs::write(format!("{BLDIR}/{device}/brightness"), format!("{change}")).expect("Couldn't write to brightness file");
     }
 }
 
 fn print_help() {
-    let help_str = "
-    blight uses brightnessctl to find current device, and updates brightness accordingly.\n
-    blight dec [optional step size] - decrease brightness
-    blight inc [optional step size] - increase brightness\n
-    Example: blight inc 10 (increases brightness by 10%)
+    let help_str = "blight automatically finds current GPU device, and updates brightness accordingly.\n
+blight dec [override step size] - decrease brightness
+blight inc [ocerride step size] - increase brightness
+
+Examples:
+    blight inc (increases brightness by 2% - default step size)
+    blight dec 10 (increases brightness by 10%)
     ";
     println!("{help_str}")
 }
