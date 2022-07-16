@@ -67,8 +67,10 @@ fn main() {
             [dir] if dir == "inc" => change_bl("2", dir),
             [dir] if dir == "dec" => change_bl("2",dir),
             [case] if case == "help" => print_help(),
-            _ => ()
+            _ => print_help(),
         }
+    } else {
+        print_help();
     }
 }
 
@@ -116,9 +118,9 @@ fn set_bl(val: &str) {
 }
 
 fn print_help() {
-    let help_str = "blight automatically finds current GPU device, and updates brightness accordingly.\n
-blight dec [override step size] - decrease brightness
+    let help_str = "blight automatically detects GPU device, and updates brightness accordingly.\n
 blight inc [ocerride step size] - increase brightness
+blight dec [override step size] - decrease brightness
 blight set [value] - set custom brightness value
 
 Examples:
