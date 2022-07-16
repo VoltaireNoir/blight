@@ -61,7 +61,7 @@ fn main() {
     if args.len() > 1 {
         match &args[1..] {
             [dir,step_size] if dir == "inc" => change_bl(step_size, dir),
-            [dir,step_size] if dir == "inc" => change_bl(step_size, dir),
+            [dir,step_size] if dir == "dec" => change_bl(step_size, dir),
             [case,value] if case == "set" => set_bl(value),
             [case,value] if case == "set" => set_bl(value),
             [dir] if dir == "inc" => change_bl("2", dir),
