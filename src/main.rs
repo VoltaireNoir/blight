@@ -116,6 +116,7 @@ fn print_help() {
     let help_str = "blight automatically finds current GPU device, and updates brightness accordingly.\n
 blight dec [override step size] - decrease brightness
 blight inc [ocerride step size] - increase brightness
+blight set [value] - set custom brightness value
 
 Examples:
     blight inc (increases brightness by 2% - default step size)
