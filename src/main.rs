@@ -1,5 +1,4 @@
-use std::env;
-use std::fs;
+use std::{env,fs};
 const BLDIR: &str = "/sys/class/backlight";
 
 struct Device {
@@ -11,7 +10,9 @@ struct Device {
 impl Device {
     fn new() -> Device {
         let name = Device::detect_device();
-        Device { name: name.clone(), current: Device::get_current(&name), max: Device::get_max(&name) }
+        Device { name: name.clone(),
+                 current: Device::get_current(&name),
+                 max: Device::get_max(&name) }
     }
 
     fn detect_device() -> String {
@@ -73,7 +74,9 @@ fn main() {
 
 fn calculate_change(current: u16, max: u16, step_size: u16, dir: &str) -> u16 {
     let step: u16 = (max as f32 * (step_size as f32 / 100.0 )) as u16;
-    let change: u16 = if dir == "dec" {current.saturating_sub(step)} else {current.saturating_add(step)};
+    let change: u16 = {
+        if dir == "dec" {current.saturating_sub(step)} else {current.saturating_add(step)}
+    };
 
     if change > max {
         max
