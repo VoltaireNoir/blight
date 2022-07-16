@@ -26,7 +26,7 @@ fn get_device() -> String {
     for d in dirs {
         let p: String = d.unwrap().file_name().to_string_lossy().to_string();
 
-        if ["amdgpu_bl0","amdgpu_bl1","acpi_video0"].contains(&p.as_str()) {
+        if ["amdgpu_bl0","amdgpu_bl1","acpi_video0","intel_backlight"].contains(&p.as_str()) {
             return p;
         }
     }
