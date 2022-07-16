@@ -8,7 +8,9 @@ fn main() {
     if args.len() > 1 {
         match &args[1..] {
             [dir,step_size] if dir == "inc" => change_bl(step_size, dir),
-            [dir,step_size] if dir == "dec" => change_bl(step_size, dir),
+            [dir,step_size] if dir == "inc" => change_bl(step_size, dir),
+            [case,value] if case == "set" => set_bl(value),
+            [case,value] if case == "set" => set_bl(value),
             [dir] if dir == "inc" => change_bl("2", dir),
             [dir] if dir == "dec" => change_bl("2",dir),
             [case] if case == "help" => print_help(),
@@ -63,13 +65,35 @@ fn calculate_change(current: u16, max: u16, step_size: u16, dir: &str) -> u16 {
 }
 
 fn change_bl(step_size: &str, dir: &str) {
-    let step_size: u16 = step_size.parse().expect("Invalid step size");
+    let step_size: u16 = match step_size.parse() {
+        Ok(n) => n,
+        Err(_) => {
+            println!("Invalid step size: use a positive integer");
+            return
+        },
+    };
     let device = get_device();
     let current = get_current(&device);
     let max = get_max(&device);
     let change = calculate_change(current, max, step_size, dir);
     if change != current {
         fs::write(format!("{BLDIR}/{device}/brightness"), format!("{change}")).expect("Couldn't write to brightness file");
+    }
+}
+
+fn set_bl(val: &str) {
+    let val: u16 = match val.parse() {
+        Ok(n) => n,
+        Err(_) => {
+            println!("Invalid value: use a positive integer.");
+            return
+        }
+    };
+    let device = get_device();
+    let current = get_current(&device);
+    let max = get_max(&device);
+    if (val <= max) & (val != current) {
+        fs::write(format!("{BLDIR}/{device}/brightness"), format!("{val}")).expect("Couldn't write to brightness file");
     }
 }
 
