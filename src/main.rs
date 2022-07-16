@@ -2,6 +2,58 @@ use std::env;
 use std::fs;
 const BLDIR: &str = "/sys/class/backlight";
 
+struct Device {
+    name: String,
+    current: u16,
+    max: u16,
+}
+
+impl Device {
+    fn new() -> Device {
+        let name = Device::detect_device();
+        Device { name: name.clone(), current: Device::get_current(&name), max: Device::get_max(&name) }
+    }
+
+    fn detect_device() -> String {
+        let dirs = fs::read_dir(BLDIR)
+            .expect("Failed to read backglight dir");
+
+        for d in dirs {
+            let p: String = d.unwrap().file_name().to_string_lossy().to_string();
+
+            if ["amdgpu_bl0","amdgpu_bl1","acpi_video0","intel_backlight"].contains(&p.as_str()) {
+                return p;
+            }
+        }
+
+        String::from("nvidia_0")
+    }
+
+    fn get_max(device: &str) -> u16 {
+        let max: u16 = fs::read_to_string(format!("{BLDIR}/{device}/max_brightness"))
+            .expect("Failed to read max value")
+            .trim()
+            .parse()
+            .expect("Failed to parse max value");
+        max
+    }
+
+    fn get_current(device: &str) -> u16 {
+        let current: u16 = fs::read_to_string(format!("{BLDIR}/{device}/brightness"))
+            .expect("Failed to read max value")
+            .trim()
+            .parse()
+            .expect("Failed to parse max value");
+        current
+    }
+
+    fn write_value(&self, value: u16) {
+        fs::write(format!("{BLDIR}/{}/brightness",self.name), format!("{value}"))
+            .expect("Couldn't write to brightness file");
+    }
+
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
 
@@ -17,39 +69,6 @@ fn main() {
             _ => ()
         }
     }
-}
-
-fn get_device() -> String {
-    let dirs = fs::read_dir(BLDIR)
-        .expect("Failed to read backglight dir");
-
-    for d in dirs {
-        let p: String = d.unwrap().file_name().to_string_lossy().to_string();
-
-        if ["amdgpu_bl0","amdgpu_bl1","acpi_video0","intel_backlight"].contains(&p.as_str()) {
-            return p;
-        }
-    }
-
-    String::from("nvidia_0")
-}
-
-fn get_max(device: &str) -> u16 {
-    let max: u16 = fs::read_to_string(format!("{BLDIR}/{device}/max_brightness"))
-        .expect("Failed to read max value")
-        .trim()
-        .parse()
-        .expect("Failed to parse max value");
-    max
-}
-
-fn get_current(device: &str) -> u16 {
-    let current: u16 = fs::read_to_string(format!("{BLDIR}/{device}/brightness"))
-        .expect("Failed to read max value")
-        .trim()
-        .parse()
-        .expect("Failed to parse max value");
-    current
 }
 
 fn calculate_change(current: u16, max: u16, step_size: u16, dir: &str) -> u16 {
@@ -72,12 +91,10 @@ fn change_bl(step_size: &str, dir: &str) {
             return
         },
     };
-    let device = get_device();
-    let current = get_current(&device);
-    let max = get_max(&device);
-    let change = calculate_change(current, max, step_size, dir);
-    if change != current {
-        fs::write(format!("{BLDIR}/{device}/brightness"), format!("{change}")).expect("Couldn't write to brightness file");
+    let device = Device::new();
+    let change = calculate_change(device.current, device.max, step_size, dir);
+    if change != device.current {
+        device.write_value(change);
     }
 }
 
@@ -89,11 +106,9 @@ fn set_bl(val: &str) {
             return
         }
     };
-    let device = get_device();
-    let current = get_current(&device);
-    let max = get_max(&device);
-    if (val <= max) & (val != current) {
-        fs::write(format!("{BLDIR}/{device}/brightness"), format!("{val}")).expect("Couldn't write to brightness file");
+    let device = Device::new();
+    if (val <= device.max) & (val != device.current) {
+        device.write_value(val);
     }
 }
 
