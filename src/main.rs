@@ -1,4 +1,6 @@
-use std::{env,fs};
+use std::{env,fs,time::Instant};
+use futures::executor::block_on;
+
 const BLDIR: &str = "/sys/class/backlight";
 
 struct Device {
@@ -8,11 +10,12 @@ struct Device {
 }
 
 impl Device {
-    fn load() -> Device {
+    async fn load() -> Device {
         let name = Device::detect_device();
-        Device { name: name.clone(),
-                 current: Device::get_current(&name),
-                 max: Device::get_max(&name) }
+        Device { current: Device::get_current(&name).await,
+                 max: Device::get_max(&name).await,
+                 name,
+        }
     }
 
     fn detect_device() -> String {
@@ -30,7 +33,7 @@ impl Device {
         String::from("nvidia_0")
     }
 
-    fn get_max(device: &str) -> u16 {
+    async fn get_max(device: &str) -> u16 {
         let max: u16 = fs::read_to_string(format!("{BLDIR}/{device}/max_brightness"))
             .expect("Failed to read max value")
             .trim()
@@ -39,7 +42,7 @@ impl Device {
         max
     }
 
-    fn get_current(device: &str) -> u16 {
+    async fn get_current(device: &str) -> u16 {
         let current: u16 = fs::read_to_string(format!("{BLDIR}/{device}/brightness"))
             .expect("Failed to read max value")
             .trim()
@@ -102,7 +105,7 @@ fn change_bl(step_size: &str, dir: Direction) {
             return
         },
     };
-    let device = Device::load();
+    let device = block_on(Device::load());
     let change = calculate_change(device.current, device.max, step_size, dir);
     if change != device.current {
         device.write_value(change);
@@ -117,7 +120,7 @@ fn set_bl(val: &str) {
             return
         }
     };
-    let device = Device::load();
+    let device = block_on(Device::load());
     if (val <= device.max) & (val != device.current) {
         device.write_value(val);
     }
