@@ -1,4 +1,4 @@
-use std::{env,fs,time::Instant};
+use std::{env,fs};
 use futures::executor::block_on;
 
 const BLDIR: &str = "/sys/class/backlight";
