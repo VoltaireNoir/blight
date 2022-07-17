@@ -10,6 +10,10 @@ struct Device {
 }
 
 impl Device {
+    fn new() -> Device {
+        block_on(Device::load())
+    }
+
     async fn load() -> Device {
         let name = Device::detect_device();
         Device { current: Device::get_current(&name).await,
@@ -105,7 +109,7 @@ fn change_bl(step_size: &str, dir: Direction) {
             return
         },
     };
-    let device = block_on(Device::load());
+    let device = Device::new();
     let change = calculate_change(device.current, device.max, step_size, dir);
     if change != device.current {
         device.write_value(change);
@@ -120,7 +124,7 @@ fn set_bl(val: &str) {
             return
         }
     };
-    let device = block_on(Device::load());
+    let device = Device::new();
     if (val <= device.max) & (val != device.current) {
         device.write_value(val);
     }
