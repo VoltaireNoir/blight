@@ -13,6 +13,8 @@ fn main() {
             [dir, step_size] if dir == "dec" => change_bl(step_size, reg, dec),
             [case, value] if case == "set" => set_bl(value),
             [case, value] if case == "set" => set_bl(value),
+            [case, value] if case == "sweep-up" => change_bl(value, sweep, inc),
+            [case, value] if case == "sweep-down" => change_bl(value, sweep, dec),
             [dir] if dir == "inc" => change_bl("2", reg, inc),
             [dir] if dir == "dec" => change_bl("2", reg, dec),
             [case] if case == "sweep-up" => change_bl("10", sweep, inc),
