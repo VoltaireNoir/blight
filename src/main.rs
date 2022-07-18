@@ -1,8 +1,10 @@
 use blight::{Device, Direction, Change};
-use std::{env,thread,time::Duration};
+use std::{env,thread,time::Duration,process::Command};
 use colored::*;
 
 fn main() {
+    if is_running() { return }
+
     let args: Vec<String> = env::args().collect();
     let (inc, dec) = (Direction::Inc, Direction::Dec);
     let (reg, sweep) = (Change::Regular, Change::Sweep);
@@ -100,6 +102,17 @@ fn sweep(device: &Device, change: u16, dir: &Direction) {
             }
         }
     }
+}
+
+fn is_running() -> bool {
+    let name = env::current_exe().unwrap().file_name().unwrap().to_string_lossy().to_string();
+    let out = Command::new("pgrep")
+        .arg("-x")
+        .arg(name)
+        .output()
+        .expect("Process command failed");
+    let out = String::from_utf8(out.stdout).expect("Failed to convert");
+    if out.trim().len() > 6 { true } else { false }
 }
 
 fn print_help() {
