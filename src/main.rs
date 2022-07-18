@@ -50,29 +50,16 @@ fn change_bl(step_size: &str, ch: Change, dir: Direction) {
     };
     let device = Device::new();
     let change = calculate_change(device.current, device.max, step_size, &dir);
-    match ch {
-        Change::Sweep => {
-            if let Direction::Inc = &dir {
-                let mut val = device.current + 1;
+    if change != device.current {
+        match ch {
+            Change::Sweep => {
+                sweep(&device, change, &dir);
+            },
 
-                while val <= change {
-                    device.write_value(val);
-                    thread::sleep(Duration::from_millis(30));
-                    val += 1;
+            Change::Regular => {
+                if change != device.current {
+                    device.write_value(change);
                 }
-            } else {
-                let mut val = device.current - 1;
-
-                while val >= change {
-                    device.write_value(val);
-                    thread::sleep(Duration::from_millis(30));
-                    val -= 1;
-                }
-            }
-        },
-        Change::Regular => {
-            if change != device.current {
-                device.write_value(change);
             }
         }
     }
@@ -89,6 +76,29 @@ fn set_bl(val: &str) {
     let device = Device::new();
     if (val <= device.max) & (val != device.current) {
         device.write_value(val);
+    }
+}
+
+fn sweep(device: &Device, change: u16, dir: &Direction) {
+    match dir {
+        Direction::Inc => {
+            let mut val = device.current + 1;
+
+            while val <= change {
+                device.write_value(val);
+                thread::sleep(Duration::from_millis(30));
+                val += 1;
+            }
+        },
+        Direction::Dec => {
+            let mut val = device.current - 1;
+
+            while val >= change {
+                device.write_value(val);
+                thread::sleep(Duration::from_millis(30));
+                if val != 0 {val -= 1} else {break};
+            }
+        }
     }
 }
 
