@@ -7,6 +7,11 @@ pub enum Direction {
     Dec
 }
 
+pub enum Change {
+    Sweep,
+    Regular,
+}
+
 pub struct Device {
     pub name: String,
     pub current: u16,

@@ -1,19 +1,22 @@
-use blight::{Device, Direction};
-use std::env;
+use blight::{Device, Direction, Change};
+use std::{env,thread,time::Duration};
 use colored::*;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
     let (inc, dec) = (Direction::Inc, Direction::Dec);
+    let (reg, sweep) = (Change::Regular, Change::Sweep);
 
     if args.len() > 1 {
         match &args[1..] {
-            [dir, step_size] if dir == "inc" => change_bl(step_size, inc),
-            [dir, step_size] if dir == "dec" => change_bl(step_size, dec),
+            [dir, step_size] if dir == "inc" => change_bl(step_size, reg, inc),
+            [dir, step_size] if dir == "dec" => change_bl(step_size, reg, dec),
             [case, value] if case == "set" => set_bl(value),
             [case, value] if case == "set" => set_bl(value),
-            [dir] if dir == "inc" => change_bl("2", inc),
-            [dir] if dir == "dec" => change_bl("2", dec),
+            [dir] if dir == "inc" => change_bl("2", reg, inc),
+            [dir] if dir == "dec" => change_bl("2", reg, dec),
+            [case] if case == "sweep-up" => change_bl("10", sweep, inc),
+            [case] if case == "sweep-down" => change_bl("10", sweep, dec),
             _ => print_help(),
         }
     } else {
@@ -21,7 +24,7 @@ fn main() {
     }
 }
 
-fn calculate_change(current: u16, max: u16, step_size: u16, dir: Direction) -> u16 {
+fn calculate_change(current: u16, max: u16, step_size: u16, dir: &Direction) -> u16 {
     let step: u16 = (max as f32 * (step_size as f32 / 100.0)) as u16;
     let change: u16 = match dir {
         Direction::Inc => current.saturating_add(step),
@@ -35,7 +38,7 @@ fn calculate_change(current: u16, max: u16, step_size: u16, dir: Direction) -> u
     }
 }
 
-fn change_bl(step_size: &str, dir: Direction) {
+fn change_bl(step_size: &str, ch: Change, dir: Direction) {
     let step_size: u16 = match step_size.parse() {
         Ok(n) => n,
         Err(_) => {
@@ -44,9 +47,32 @@ fn change_bl(step_size: &str, dir: Direction) {
         }
     };
     let device = Device::new();
-    let change = calculate_change(device.current, device.max, step_size, dir);
-    if change != device.current {
-        device.write_value(change);
+    let change = calculate_change(device.current, device.max, step_size, &dir);
+    match ch {
+        Change::Sweep => {
+            if let Direction::Inc = &dir {
+                let mut val = device.current + 1;
+
+                while val <= change {
+                    device.write_value(val);
+                    thread::sleep(Duration::from_millis(30));
+                    val += 1;
+                }
+            } else {
+                let mut val = device.current - 1;
+
+                while val >= change {
+                    device.write_value(val);
+                    thread::sleep(Duration::from_millis(30));
+                    val -= 1;
+                }
+            }
+        },
+        Change::Regular => {
+            if change != device.current {
+                device.write_value(change);
+            }
+        }
     }
 }
 
