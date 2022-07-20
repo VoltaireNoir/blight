@@ -1,5 +1,6 @@
 # blight
 **A simple commandline utility to adjust backlight on Linux systems with hybrid GPU set-up.**
+![](blight.png)
 
 > **Note**
 > For this program to run without root privilages, the user needs to be in the video group and might need udev rules to allow write access to brightness files. Read more about it [here](https://wiki.archlinux.org/title/Backlight#ACPI).
