@@ -47,7 +47,7 @@ fn change_bl(step_size: &str, ch: Change, dir: Direction) {
         Ok(n) => n,
         Err(_) => {
             println!("{}","Invalid step size: use a positive integer".red().bold());
-            return;
+            return
         }
     };
     let device = Device::new();
@@ -57,7 +57,6 @@ fn change_bl(step_size: &str, ch: Change, dir: Direction) {
             Change::Sweep => {
                 sweep(&device, change, &dir);
             },
-
             Change::Regular => {
                 if change != device.current {
                     device.write_value(change);
@@ -88,7 +87,7 @@ fn sweep(device: &Device, change: u16, dir: &Direction) {
 
             while val <= change {
                 device.write_value(val);
-                thread::sleep(Duration::from_millis(30));
+                thread::sleep(Duration::from_millis(25));
                 val += 1;
             }
         },
@@ -97,7 +96,7 @@ fn sweep(device: &Device, change: u16, dir: &Direction) {
 
             while val >= change {
                 device.write_value(val);
-                thread::sleep(Duration::from_millis(30));
+                thread::sleep(Duration::from_millis(25));
                 if val != 0 {val -= 1} else {break};
             }
         }

@@ -19,6 +19,7 @@ pub struct Device {
 }
 
 impl Device {
+
     pub fn new() -> Device {
         block_on(Device::load())
     }

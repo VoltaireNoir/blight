@@ -11,3 +11,4 @@ futures = "0.3.21"
 
 [profile.release]
 strip = true
+panic = 'abort'
