@@ -1,5 +1,5 @@
 # blight
-##### __A simple commandline utility to adjust backlight on Linux systems with hybrid GPU set-up.__
+#### _A simple commandline utility to adjust backlight on Linux systems with hybrid GPU set-up._
 ![](blight.png)
 
 > **Note**
