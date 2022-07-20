@@ -118,9 +118,12 @@ fn print_help() {
     let title = "blight automatically detects GPU device, and updates brightness accordingly.";
     let commands = "blight inc [ocerride step size] - increase brightness
 blight dec [override step size] - decrease brightness
-blight set [value] - set custom brightness value";
+blight set [value] - set custom brightness value
+blight sweep-up [override default val] - increase brightness smoothly (default by 10%)
+blight sweep-down [override default val] - decrease brightness smoothly (default by 10%)";
     let exampels = "Examples:
     blight inc (increases brightness by 2% - default step size)
-    blight dec 10 (increases brightness by 10%)";
+    blight dec 10 (increases brightness by 10%)
+    blight sweep-up 15 (smoothly increases brightness by 15%)";
     println!("{}\n\n{}\n\n{}",title.blue().bold(),commands.magenta(),exampels.bright_yellow());
 }
