@@ -25,26 +25,30 @@ impl Device {
     }
 
     async fn load() -> Device {
-        let name = Self::detect_device();
+        let name = Self::detect_device().expect("No known backlight devices found on system");
+
         Device { current: Self::get_current(&name).await,
                  max: Self::get_max(&name).await,
                  name,
         }
     }
 
-    fn detect_device() -> String {
+    fn detect_device() -> Option<String> {
+
         let dirs = fs::read_dir(BLDIR)
             .expect("Failed to read backglight dir");
-
+        let mut nv: bool = false;
         for d in dirs {
             let p: String = d.unwrap().file_name().to_string_lossy().to_string();
 
+            if !nv { if p.contains("nvidia") { nv = true }; };
+
             if ["amdgpu_bl0","amdgpu_bl1","acpi_video0","intel_backlight"].contains(&p.as_str()) {
-                return p;
-            }
+                return Some(p);
+            };
         }
 
-        String::from("nvidia_0")
+        if nv { Some(String::from("nvidia_0")) } else { None }
     }
 
     async fn get_max(device: &str) -> u16 {
