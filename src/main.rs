@@ -50,7 +50,13 @@ fn change_bl(step_size: &str, ch: Change, dir: Direction) {
             return
         }
     };
-    let device = Device::new();
+    let device = match Device::new() {
+        Some(d) => d,
+        None => {
+            println!("{}","Error: No known device detected on system".red());
+            return ;
+        }
+    };
     let change = calculate_change(device.current, device.max, step_size, &dir);
     if change != device.current {
         match ch {
@@ -74,7 +80,13 @@ fn set_bl(val: &str) {
             return;
         }
     };
-    let device = Device::new();
+    let device = match Device::new() {
+        Some(d) => d,
+        None => {
+            println!("{}","Error: No known device detected on system".red());
+            return;
+        }
+    };
     if (val <= device.max) & (val != device.current) {
         device.write_value(val);
     }

@@ -20,13 +20,12 @@ pub struct Device {
 
 impl Device {
 
-    pub fn new() -> Device {
-        block_on(Device::load())
+    pub fn new() -> Option<Device> {
+        let name = Self::detect_device()?;
+        Some(block_on(Self::load(name)))
     }
 
-    async fn load() -> Device {
-        let name = Self::detect_device().expect("No known backlight devices found on system");
-
+    async fn load(name: String) -> Device {
         Device { current: Self::get_current(&name).await,
                  max: Self::get_max(&name).await,
                  name,
