@@ -12,6 +12,7 @@ pub enum Change {
     Regular,
 }
 
+#[derive(Debug)]
 pub struct Device {
     pub name: String,
     pub current: u16,

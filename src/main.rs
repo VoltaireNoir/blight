@@ -131,8 +131,8 @@ fn print_help() {
     let commands = "blight inc [ocerride step size] - increase brightness
 blight dec [override step size] - decrease brightness
 blight set [value] - set custom brightness value
-blight sweep-up [override default val] - increase brightness smoothly (default by 10%)
-blight sweep-down [override default val] - decrease brightness smoothly (default by 10%)";
+blight sweep-up [override step size] - increase brightness smoothly (default by 10%)
+blight sweep-down [override step size] - decrease brightness smoothly (default by 10%)";
     let exampels = "Examples:
     blight inc (increases brightness by 2% - default step size)
     blight dec 10 (increases brightness by 10%)
