@@ -60,14 +60,8 @@ fn change_bl(step_size: &str, ch: Change, dir: Direction) {
     let change = calculate_change(device.current, device.max, step_size, &dir);
     if change != device.current {
         match ch {
-            Change::Sweep => {
-                sweep(&device, change, &dir);
-            },
-            Change::Regular => {
-                if change != device.current {
-                    device.write_value(change);
-                }
-            }
+            Change::Sweep => sweep(&device, change, &dir),
+            Change::Regular => device.write_value(change),
         }
     }
 }
@@ -116,7 +110,7 @@ fn sweep(device: &Device, change: u16, dir: &Direction) {
 }
 
 fn is_running() -> bool {
-    let name = env::current_exe().unwrap().file_name().unwrap().to_string_lossy().to_string();
+    let name = env::current_exe().unwrap().file_name().unwrap().to_string_lossy().into_owned();
     let out = Command::new("pgrep")
         .arg("-x")
         .arg(name)
@@ -138,4 +132,35 @@ blight sweep-down [override step size] - decrease brightness smoothly (default b
     blight dec 10 (increases brightness by 10%)
     blight sweep-up 15 (smoothly increases brightness by 15%)";
     println!("{}\n\n{}\n\n{}",title.blue().bold(),commands.magenta(),exampels.bright_yellow());
+}
+
+// Unit tests
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn inc_calculation() {
+        let ch = calculate_change(10, 100, 10, &Direction::Inc);
+        assert_eq!(ch,20)
+    }
+
+    #[test]
+    fn dec_calculation() {
+        let ch = calculate_change(30, 100, 10, &Direction::Dec);
+        assert_eq!(ch,20)
+    }
+
+    #[test]
+    fn inc_calculation_max() {
+        let ch = calculate_change(90, 100, 20, &Direction::Inc);
+        assert_eq!(ch,100)
+    }
+
+    #[test]
+    fn dec_calculation_max() {
+        let ch = calculate_change(10, 100, 20, &Direction::Dec);
+        assert_eq!(ch,0)
+    }
 }

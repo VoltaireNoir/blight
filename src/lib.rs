@@ -34,7 +34,6 @@ impl Device {
     }
 
     fn detect_device() -> Option<String> {
-
         let dirs = fs::read_dir(BLDIR)
             .expect("Failed to read backglight dir");
         let mut nv: bool = false;
@@ -74,4 +73,32 @@ impl Device {
             .expect("Couldn't write to brightness file");
     }
 
+}
+
+#[cfg(test)]
+mod libtests {
+    use super::*;
+
+    #[test]
+    fn detecting_device() {
+        let name = Device::detect_device();
+        assert!(name.is_some());
+        println!("Detected device name: {}",name.unwrap());
+    }
+
+    #[test]
+    fn writing_value() {
+        let d = Device::new().unwrap();
+        d.write_value(50);
+        let r = fs::read_to_string(format!("{BLDIR}/{}/brightness",d.name)).expect("failed to read during test");
+        let res = r.trim();
+        assert_eq!("50",res,"Result was {res}")
+    }
+
+    #[test]
+    fn current_value() {
+        let current = block_on(Device::get_current("nvidia_0"));
+        let expected = fs::read_to_string(format!("{BLDIR}/nvidia_0/brightness")).unwrap();
+        assert_eq!(current.to_string(),expected.trim())
+    }
 }
