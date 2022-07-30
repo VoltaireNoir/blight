@@ -1,5 +1,10 @@
 [package]
 name = "blight"
+description = "A hassle-free CLI utility to control backlight on Linux laptops with hybrid GPU set-up"
+categories = ["command-line-utilities"]
+keywords = ["backlight","CLI","utility","hybrid-gpu","brightness"]
+repository = "https://github.com/VoltaireNoir/blight"
+license = "MIT"
 version = "0.2.0"
 edition = "2021"
 
@@ -11,4 +16,5 @@ futures = "0.3.21"
 
 [profile.release]
 strip = true
+lto = true
 panic = 'abort'
