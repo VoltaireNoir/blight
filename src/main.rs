@@ -140,7 +140,7 @@ blight status - backlight device status";
     blight inc (increases brightness by 2% - default step size)
     blight dec 10 (increases brightness by 10%)
     blight sweep-up 15 (smoothly increases brightness by 15%)";
-    println!("{}\n\n{}\n\n{}",title.blue().bold(),commands.magenta().bold(),exampels.bright_yellow());
+    println!("{}\n\n{}\n\n{}",title.blue().bold(),commands.green().bold(),exampels.bright_yellow());
 }
 
 // Unit tests
