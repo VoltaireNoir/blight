@@ -34,20 +34,22 @@ impl Device {
     }
 
     fn detect_device() -> Option<String> {
-        let dirs = fs::read_dir(BLDIR)
-            .expect("Failed to read backglight dir");
+        let dirs = fs::read_dir(BLDIR).expect("Failed to read dir");
         let mut nv: bool = false;
-        for d in dirs {
-            let p: String = d.unwrap().file_name().to_string_lossy().to_string();
+        let mut acpi: bool = false;
+        for entry in dirs {
+                let  name = entry.unwrap().file_name();
+                if let Some(name) = name.to_str() {
+                    if !nv && name.contains("nvidia") { nv = true };
+                    if !acpi && name.contains("acpi") { acpi = true };
 
-            if !nv { if p.contains("nvidia") { nv = true }; };
-
-            if ["amdgpu_bl0","amdgpu_bl1","acpi_video0","intel_backlight"].contains(&p.as_str()) {
-                return Some(p);
+                    if name.contains("amdgpu") || name.contains("intel") {
+                        return Some(name.to_string())
+                    }
+                }
             };
-        }
 
-        if nv { Some(String::from("nvidia_0")) } else { None }
+        if nv {Some(String::from("nvidia_0"))} else if acpi {Some(String::from("acpi_video0"))} else {None}
     }
 
     async fn get_max(device: &str) -> u16 {

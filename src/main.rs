@@ -53,7 +53,7 @@ fn change_bl(step_size: &str, ch: Change, dir: Direction) {
     let device = match Device::new() {
         Some(d) => d,
         None => {
-            println!("{}","Error: No known device detected on system".red());
+            println!("{}","Error: No known device detected on system".red().bold());
             return ;
         }
     };
@@ -122,16 +122,17 @@ fn is_running() -> bool {
 
 fn print_help() {
     let title = "blight automatically detects GPU device, and updates brightness accordingly.";
-    let commands = "blight inc [ocerride step size] - increase brightness
-blight dec [override step size] - decrease brightness
-blight set [value] - set custom brightness value
-blight sweep-up [override step size] - increase brightness smoothly (default by 10%)
-blight sweep-down [override step size] - decrease brightness smoothly (default by 10%)";
+    let commands = "\
+blight inc [opt val] - increase by 2%
+blight dec [opt val] - decrease by 2%
+blight set [val] - set custom brightness value
+blight sweep-up [opt val] - smoothly increase by 10%
+blight sweep-down [opt val] - smoothly decrease by 10%";
     let exampels = "Examples:
     blight inc (increases brightness by 2% - default step size)
     blight dec 10 (increases brightness by 10%)
     blight sweep-up 15 (smoothly increases brightness by 15%)";
-    println!("{}\n\n{}\n\n{}",title.blue().bold(),commands.magenta(),exampels.bright_yellow());
+    println!("{}\n\n{}\n\n{}",title.blue().bold(),commands.magenta().bold(),exampels.bright_yellow());
 }
 
 // Unit tests
