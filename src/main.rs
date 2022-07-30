@@ -103,10 +103,9 @@ fn sweep(device: &Device, change: u16, dir: &Direction) {
 }
 
 fn is_running() -> bool {
-    let name = env::current_exe().unwrap().file_name().unwrap().to_string_lossy().into_owned();
     let out = Command::new("pgrep")
         .arg("-x")
-        .arg(name)
+        .arg(env::current_exe().unwrap().file_name().unwrap().to_str().unwrap())
         .output()
         .expect("Process command failed");
     let out = String::from_utf8(out.stdout).expect("Failed to convert");
