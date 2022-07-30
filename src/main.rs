@@ -21,6 +21,7 @@ fn main() {
             [dir] if dir == "dec" => change_bl("2", reg, dec),
             [case] if case == "sweep-up" => change_bl("10", sweep, inc),
             [case] if case == "sweep-down" => change_bl("10", sweep, dec),
+            [case] if case == "status" => print_status(),
             _ => print_help(),
         }
     } else {
@@ -120,6 +121,23 @@ fn is_running() -> bool {
     if out.trim().len() > 6 { true } else { false }
 }
 
+fn print_status() {
+    let device = match Device::new() {
+        Some(d) => d,
+        None => {
+            println!("{}","Error: No known device detected on system".red());
+            return;
+        }
+    };
+    println!(
+        "{}\nDetected device: {}\nCurrent Brightness: {}\nMax Brightness {}",
+        "Device status".bold(),
+        device.name.green(),
+        device.current.to_string().green(),
+        device.max.to_string().green()
+    );
+}
+
 fn print_help() {
     let title = "blight automatically detects GPU device, and updates brightness accordingly.";
     let commands = "\
@@ -127,7 +145,8 @@ blight inc [opt val] - increase by 2%
 blight dec [opt val] - decrease by 2%
 blight set [val] - set custom brightness value
 blight sweep-up [opt val] - smoothly increase by 10%
-blight sweep-down [opt val] - smoothly decrease by 10%";
+blight sweep-down [opt val] - smoothly decrease by 10%
+blight status - backlight device status";
     let exampels = "Examples:
     blight inc (increases brightness by 2% - default step size)
     blight dec 10 (increases brightness by 10%)
