@@ -1,5 +1,5 @@
 use blight::{Device, Direction, Change};
-use std::{env,thread,time::Duration,process::Command};
+use std::{env,thread,time::Duration,process::{self,Command}};
 use colored::*;
 
 fn main() {
@@ -44,20 +44,16 @@ fn calculate_change(current: u16, max: u16, step_size: u16, dir: &Direction) -> 
 }
 
 fn change_bl(step_size: &str, ch: Change, dir: Direction) {
-    let step_size: u16 = match step_size.parse() {
-        Ok(n) => n,
-        Err(_) => {
-            println!("{}","Invalid step size: use a positive integer".red().bold());
-            return
-        }
-    };
-    let device = match Device::new() {
-        Some(d) => d,
-        None => {
-            println!("{}","Error: No known device detected on system".red().bold());
-            return ;
-        }
-    };
+    let step_size: u16 = step_size.parse().unwrap_or_else(|_| {
+        println!("{}","Invalid step size: use a positive integer".red().bold());
+        process::exit(1)
+    });
+
+    let device = Device::new().unwrap_or_else(|| {
+            println!("{}","Error: No known device detected on system".red());
+            process::exit(1)
+    });
+
     let change = calculate_change(device.current, device.max, step_size, &dir);
     if change != device.current {
         match ch {
@@ -68,20 +64,16 @@ fn change_bl(step_size: &str, ch: Change, dir: Direction) {
 }
 
 fn set_bl(val: &str) {
-    let val: u16 = match val.parse() {
-        Ok(n) => n,
-        Err(_) => {
-            println!("{}","Invalid value: use a positive integer".red().bold());
-            return;
-        }
-    };
-    let device = match Device::new() {
-        Some(d) => d,
-        None => {
+    let val: u16 = val.parse().unwrap_or_else(|_| {
+        println!("{}","Invalid value: use a positive integer".red().bold());
+        process::exit(1)
+    });
+
+    let device = Device::new().unwrap_or_else(|| {
             println!("{}","Error: No known device detected on system".red());
-            return;
-        }
-    };
+            process::exit(1)
+    });
+
     if (val <= device.max) & (val != device.current) {
         device.write_value(val);
     }
@@ -122,13 +114,11 @@ fn is_running() -> bool {
 }
 
 fn print_status() {
-    let device = match Device::new() {
-        Some(d) => d,
-        None => {
+    let device = Device::new().unwrap_or_else(|| {
             println!("{}","Error: No known device detected on system".red());
-            return;
-        }
-    };
+            process::exit(1)
+    });
+
     println!(
         "{}\nDetected device: {}\nCurrent Brightness: {}\nMax Brightness {}",
         "Device status".bold(),
