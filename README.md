@@ -1,4 +1,5 @@
 # blight
+[![Rust](https://github.com/VoltaireNoir/blight/actions/workflows/rust.yml/badge.svg)](https://github.com/VoltaireNoir/blight/actions/workflows/rust.yml)
 #### _A hassle-free CLI utility to manage backlight on Linux laptops with hybrid GPU configuration._
 ![](blight.png)
 > **Note**
