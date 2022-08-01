@@ -42,7 +42,7 @@ pub struct Device {
 impl Device {
     /// Creates a new Device instance by reading values from /sys/class/backlight/ directory based on the detected GPU device.\
     /// Returns the Device struct wrapped in Some() or returns None when no known device is detected \
-    /// Intel and AmdGPU are prioritized, if they are absent Nvidia is used, otherwise it falls back on ACPI.
+    /// This is how the devices are priorirized AmdGPU or Intel > Nvdia > ACPI > Any Fallback Device
     pub fn new() -> Option<Device> {
         let name = Self::detect_device(BLDIR)?;
         Some(block_on(Self::load(name)))
