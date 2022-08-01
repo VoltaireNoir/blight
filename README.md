@@ -2,7 +2,7 @@
 #### _A hassle-free CLI utility to manage backlight on Linux laptops with hybrid GPU configuration._
 ![](blight.png)
 > **Note**
-> For this program to run without root privilages, the user needs to be in the video group and might need udev rules to allow write access to brightness files. Read more about it [here](https://wiki.archlinux.org/title/Backlight#ACPI).
+> For this program to run without root privileges, the user needs to be in the video group and might need udev rules to allow write access to brightness files. Read more about it [here](https://wiki.archlinux.org/title/Backlight#ACPI).
 ## About
 A lot of Linux backlight utilities often fail to detect the right backlight device to control in laptops that ship with Intel or Amd iGPUs and an Nvidia dGPU with proprietary drivers. This utility aims to solve that problem by prioritizing integrated graphic devices, followed by dedicated Nvdia GPU and ACPI kernel module. This means that you do not have to manually specify which device is currently active whenever you switch between your iGPU and dGPU using the MUX switch. Other than that, blight also implements sweep-up and sweep-down option, which lets you change brightness in a smooth sweeping manner, rather than in sudden jerky increments/decrements.
 
@@ -25,7 +25,7 @@ Set custom shortcuts using your distro settings or pair it with a hotkey daemon 
 - `cargo install blight`
 - Binary will be compiled to `.cargo/bin`
 
-## Compile from Source
+### Compile from Source
 - Clone repository
 - `cd cloned-repo`
 - `cargo build -r`
