@@ -1,3 +1,9 @@
+//! # blight
+//! **blight is a hassle-free CLI for managing backlight on Linux laptops with hybrid GPU configuration.** \
+//! \
+//! Run `blight` to display all supported commands and options\
+//! > Note: *You need write permission to `/sys/class/backlight/{your_device}/brightness` for this utility to work.*
+
 use std::fs;
 use colored::*;
 use futures::executor::block_on;
@@ -7,18 +13,24 @@ use std::{
     thread,
     time::Duration,
 };
+
 const BLDIR: &str = "/sys/class/backlight";
 
+/// This enum is used to specify the direction in which the backlight should be changed.
+/// Inc -> Increase, Dec -> Decrease.
 pub enum Direction {
     Inc,
     Dec
 }
 
+/// This enum is used to specify the kind of backlight change to carry out. \
+/// Regular change applies the calculated change directly, whereas the sweep change occurs in incremental steps.
 pub enum Change {
     Sweep,
     Regular,
 }
 
+/// Contains name of the detected GPU device and its current and max brightness values.
 #[derive(Debug)]
 pub struct Device {
     pub name: String,
@@ -27,7 +39,9 @@ pub struct Device {
 }
 
 impl Device {
-
+    /// Creates a new Device instance by reading values from /sys/class/backlight/ directory based on the detected GPU device.\
+    /// Returns the Device struct wrapped in Some() or returns None when no known device is detected \
+    /// Intel and AmdGPU are prioritized, if they are absent Nvidia is used, otherwise it falls back on ACPI.
     pub fn new() -> Option<Device> {
         let name = Self::detect_device()?;
         Some(block_on(Self::load(name)))
@@ -78,7 +92,8 @@ impl Device {
             .expect("Failed to parse max value");
         current
     }
-
+    /// This method is used to write to the brightness file containted in /sys/class/backlight/ dir of the respective detected device.\
+    /// It takes in a brightness value, and writes to othe relavant brightness file.
     pub fn write_value(&self, value: u16) {
         fs::write(format!("{BLDIR}/{}/brightness",self.name), format!("{value}"))
             .expect("Couldn't write to brightness file");
@@ -86,6 +101,8 @@ impl Device {
 
 }
 
+/// Calculates the new value to be written to the brightness file based on the provided step-size (percentage) and direction,
+/// for the given current and max values of the detected GPU device.
 pub fn calculate_change(current: u16, max: u16, step_size: u16, dir: &Direction) -> u16 {
     let step: u16 = (max as f32 * (step_size as f32 / 100.0)) as u16;
     let change: u16 = match dir {
@@ -100,6 +117,9 @@ pub fn calculate_change(current: u16, max: u16, step_size: u16, dir: &Direction)
     }
 }
 
+/// Changes backlight based on step-size (percentage), change type and direction.\
+/// Regular change uses calculated change value based on step size and is applied instantly\
+/// Sweep change on the other hand, occurs gradually, producing a fade or sweeping effect.
 pub fn change_bl(step_size: &str, ch: Change, dir: Direction) {
     let step_size: u16 = step_size.parse().unwrap_or_else(|_| {
         println!("{}", "Invalid step size: use a positive integer".red().bold());
@@ -120,6 +140,9 @@ pub fn change_bl(step_size: &str, ch: Change, dir: Direction) {
     }
 }
 
+/// This function takes a brightness value, creates a Device struct, and writes the value to the brightness file
+/// as long as the given value falls under the min and max bounds.\
+/// Unlike change_bl, this function does not calculate any change, it writes the given value directly.
 pub fn set_bl(val: &str) {
     let val: u16 = val.parse().unwrap_or_else(|_| {
         println!("{}", "Invalid value: use a positive integer".red().bold());
@@ -136,6 +159,9 @@ pub fn set_bl(val: &str) {
     }
 }
 
+/// This function takes a borrow of Device struct, a calculated change value and the direction.\
+/// It writes to the relavant brightness file in an increment of 1 on each loop until change value is reached.\
+/// Each loop has a delay of 25ms, to produce to a smooth sweeping effect when executed.
 pub fn sweep(device: &Device, change: u16, dir: &Direction) {
     match dir {
         Direction::Inc => {
@@ -160,6 +186,8 @@ pub fn sweep(device: &Device, change: u16, dir: &Direction) {
     }
 }
 
+/// This function is the current way of determining whether another instance of blight is running.\
+/// This method depends on pgrep but this may be replaced with a better implementation in the future.
 pub fn is_running() -> bool {
     let out = Command::new("pgrep")
         .arg("-x")
@@ -181,6 +209,7 @@ pub fn is_running() -> bool {
     }
 }
 
+/// This function creates a Device instance and prints the detected device, along with its current and max brightness values.
 pub fn print_status() {
     let device = Device::new().unwrap_or_else(|| {
         println!("{}", "Error: No known device detected on system".red());
@@ -196,6 +225,7 @@ pub fn print_status() {
     );
 }
 
+/// This function prints helpful information about the CLI, such as available commands and examples.
 pub fn print_help() {
     let title = "blight automatically detects GPU device, and updates brightness accordingly.";
     let commands = "\
@@ -220,7 +250,7 @@ Examples:
 }
 
 #[cfg(test)]
-mod libtests {
+mod tests {
     use super::*;
 
     #[test]

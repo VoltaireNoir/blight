@@ -12,8 +12,8 @@ fn main() {
 
     if args.len() > 1 {
         match &args[1..] {
-            [dir, step_size] if dir == "inc" => blight::change_bl(step_size, reg, inc),
-            [dir, step_size] if dir == "dec" => blight::change_bl(step_size, reg, dec),
+            [dir, value] if dir == "inc" => blight::change_bl(value, reg, inc),
+            [dir, value] if dir == "dec" => blight::change_bl(value, reg, dec),
             [case, value] if case == "set" => blight::set_bl(value),
             [case, value] if case == "set" => blight::set_bl(value),
             [case, value] if case == "sweep-up" => blight::change_bl(value, sweep, inc),
