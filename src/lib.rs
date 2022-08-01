@@ -272,7 +272,7 @@ Examples:
 mod tests {
     use super::*;
     use std::error::Error;
-    const TESTDIR: &str = "tests/testbldir";
+    const TESTDIR: &str = "testbldir";
 
     #[test]
     fn detecting_device_nvidia() {
@@ -362,15 +362,15 @@ mod tests {
     fn setup_test_env(dirs: &[&str]) -> Result<(),Box<dyn Error>> {
         fs::create_dir(TESTDIR)?;
         for dir in dirs {
-            fs::create_dir(format!("tests/testbldir/{dir}"))?;
-            fs::write(format!("tests/testbldir/{dir}/brightness"), "50")?;
-            fs::write(format!("tests/testbldir/{dir}/max"), "100")?;
+            fs::create_dir(format!("{TESTDIR}/{dir}"))?;
+            fs::write(format!("{TESTDIR}/{dir}/brightness"), "50")?;
+            fs::write(format!("{TESTDIR}/{dir}/max"), "100")?;
         }
         Ok(())
     }
 
     fn clean_up() {
-        if fs::read_dir("tests").unwrap().any(|dir| {dir.unwrap().file_name().as_os_str() == "testbldir"}) {
+        if fs::read_dir(".").unwrap().any(|dir| {dir.unwrap().file_name().as_os_str() == "testbldir"}) {
             fs::remove_dir_all(TESTDIR).expect("Failed to clean up testing backlight directory.")
         }
     }
