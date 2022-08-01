@@ -351,7 +351,7 @@ mod tests {
     }
 
     fn setup_test_env(dirs: &[&str]) -> Result<(),Box<dyn Error>> {
-        fs::create_dir(format!("{TESTDIR}"))?;
+        fs::create_dir(TESTDIR)?;
         for dir in dirs {
             fs::create_dir(format!("tests/testbldir/{dir}"))?;
             fs::write(format!("tests/testbldir/{dir}/brightness"), "50")?;
@@ -361,9 +361,8 @@ mod tests {
     }
 
     fn clean_up() {
-        if fs::read_dir("tests/").unwrap().count() > 0 {
-            fs::remove_dir_all("tests/testbldir").expect("Failed to clean up testing backlight directory.")
+        if fs::read_dir("tests").unwrap().any(|dir| {dir.unwrap().file_name().as_os_str() == "testbldir"}) {
+            fs::remove_dir_all(TESTDIR).expect("Failed to clean up testing backlight directory.")
         }
     }
-
 }
