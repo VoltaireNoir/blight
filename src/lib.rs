@@ -1,8 +1,17 @@
 //! # About
 //! **blight is a hassle-free CLI for managing backlight on Linux laptops with hybrid GPU configuration.** \
 //! \
-//! Run `blight` to display all supported commands and options\
-//! > Note: *You need write permission to `/sys/class/backlight/{your_device}/brightness` for this utility to work.*
+//! > **Note:** You need write permission for the file `/sys/class/backlight/{your_device}/brightness` for this utility to work.
+//! > Read more about it [here](https://wiki.archlinux.org/title/Backlight#ACPI).
+//! ## Common commands
+//! - `blight inc`
+//! - `blight dec`
+//! - `blight set`
+//! - `blight status`
+//! - `blight sweep-up`
+//! - `blight sweep-down`
+//!
+//! Run `blight` in terminal to display all supported commands and options
 
 use colored::*;
 use futures::executor::block_on;
@@ -127,8 +136,8 @@ pub fn calculate_change(current: u16, max: u16, step_size: u16, dir: &Direction)
     }
 }
 
-/// Changes backlight based on step-size (percentage), change type and direction.\
-/// Regular change uses calculated change value based on step size and is applied instantly\
+/// Changes backlight based on step-size (percentage), change type and direction.
+/// Regular change uses calculated change value based on step size and is applied instantly
 /// Sweep change on the other hand, occurs gradually, producing a fade or sweeping effect.
 pub fn change_bl(step_size: &str, ch: Change, dir: Direction) {
     let step_size: u16 = step_size.parse().unwrap_or_else(|_| {
@@ -151,7 +160,7 @@ pub fn change_bl(step_size: &str, ch: Change, dir: Direction) {
 }
 
 /// This function takes a brightness value, creates a Device struct, and writes the value to the brightness file
-/// as long as the given value falls under the min and max bounds.\
+/// as long as the given value falls under the min and max bounds.
 /// Unlike change_bl, this function does not calculate any change, it writes the given value directly.
 pub fn set_bl(val: &str) {
     let val: u16 = val.parse().unwrap_or_else(|_| {
@@ -169,8 +178,8 @@ pub fn set_bl(val: &str) {
     }
 }
 
-/// This function takes a borrow of Device struct, a calculated change value and the direction.\
-/// It writes to the relavant brightness file in an increment of 1 on each loop until change value is reached.\
+/// This function takes a borrow of Device struct, a calculated change value and the direction.
+/// It writes to the relavant brightness file in an increment of 1 on each loop until change value is reached.
 /// Each loop has a delay of 25ms, to produce to a smooth sweeping effect when executed.
 pub fn sweep(device: &Device, change: u16, dir: &Direction) {
     match dir {
@@ -196,7 +205,7 @@ pub fn sweep(device: &Device, change: u16, dir: &Direction) {
     }
 }
 
-/// This function is the current way of determining whether another instance of blight is running.\
+/// This function is the current way of determining whether another instance of blight is running.
 /// This method depends on pgrep but this may be replaced with a better implementation in the future.
 pub fn is_running() -> bool {
     let out = Command::new("pgrep")
