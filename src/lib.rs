@@ -1,4 +1,4 @@
-//! # blight
+//! # About
 //! **blight is a hassle-free CLI for managing backlight on Linux laptops with hybrid GPU configuration.** \
 //! \
 //! Run `blight` to display all supported commands and options\
