@@ -4,10 +4,10 @@
 //! Run `blight` to display all supported commands and options\
 //! > Note: *You need write permission to `/sys/class/backlight/{your_device}/brightness` for this utility to work.*
 
-use std::{fs, fmt::format};
 use colored::*;
 use futures::executor::block_on;
 use std::{
+    fs,
     env,
     thread,
     process::{self, Command},
