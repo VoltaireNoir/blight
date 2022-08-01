@@ -4,13 +4,13 @@
 //! Run `blight` to display all supported commands and options\
 //! > Note: *You need write permission to `/sys/class/backlight/{your_device}/brightness` for this utility to work.*
 
-use std::fs;
+use std::{fs, fmt::format};
 use colored::*;
 use futures::executor::block_on;
 use std::{
     env,
-    process::{self, Command},
     thread,
+    process::{self, Command},
     time::Duration,
 };
 
@@ -36,6 +36,7 @@ pub struct Device {
     pub name: String,
     pub current: u16,
     pub max: u16,
+    device_dir: String,
 }
 
 impl Device {
@@ -43,40 +44,49 @@ impl Device {
     /// Returns the Device struct wrapped in Some() or returns None when no known device is detected \
     /// Intel and AmdGPU are prioritized, if they are absent Nvidia is used, otherwise it falls back on ACPI.
     pub fn new() -> Option<Device> {
-        let name = Self::detect_device()?;
+        let name = Self::detect_device(BLDIR)?;
         Some(block_on(Self::load(name)))
     }
 
     async fn load(name: String) -> Device {
-        Device { current: Self::get_current(&name).await,
-                 max: Self::get_max(&name).await,
+        let device_dir = format!("{BLDIR}/{name}");
+        Device { current: Self::get_current(&device_dir).await,
+                 max: Self::get_max(&device_dir).await,
+                 device_dir,
                  name,
         }
     }
 
-    fn detect_device() -> Option<String> {
-        let dirs = fs::read_dir(BLDIR).expect("Failed to read dir");
+    fn detect_device(bldir: &str) -> Option<String> {
+        let dirs = fs::read_dir(bldir).expect("Failed to read dir");
         let mut nv: bool = false;
         let mut acpi: bool = false;
-        for entry in dirs {
-                let  name = entry.unwrap().file_name();
-                if let Some(name) = name.to_str() {
-                    if !nv && name.contains("nvidia") { nv = true };
-                    if !acpi && name.contains("acpi") { acpi = true };
+        let mut count: u8 = 0;
+        let mut fallback = String::new();
 
-                    if name.contains("amdgpu") || name.contains("intel") {
-                        return Some(name.to_string())
-                    }
+        for entry in dirs {
+            let  name = entry.unwrap().file_name();
+            if let Some(name) = name.to_str() {
+                if !nv && name.contains("nvidia") { nv = true };
+                if !acpi && name.contains("acpi") { acpi = true };
+
+                if name.contains("amdgpu") || name.contains("intel") {
+                    return Some(name.to_string())
                 }
-            };
+                fallback = name.to_string();
+            }
+            count += 1;
+        };
+
+        if count == 0 { return None }
 
         if nv { Some(String::from("nvidia_0")) }
         else if acpi { Some(String::from("acpi_video0")) }
-        else { None }
+        else { Some(fallback) }
     }
 
-    async fn get_max(device: &str) -> u16 {
-        let max: u16 = fs::read_to_string(format!("{BLDIR}/{device}/max_brightness"))
+    async fn get_max(device_dir: &str) -> u16 {
+        let max: u16 = fs::read_to_string(format!("{device_dir}/max_brightness"))
             .expect("Failed to read max value")
             .trim()
             .parse()
@@ -84,8 +94,8 @@ impl Device {
         max
     }
 
-    async fn get_current(device: &str) -> u16 {
-        let current: u16 = fs::read_to_string(format!("{BLDIR}/{device}/brightness"))
+    async fn get_current(device_dir: &str) -> u16 {
+        let current: u16 = fs::read_to_string(format!("{device_dir}/brightness"))
             .expect("Failed to read max value")
             .trim()
             .parse()
@@ -95,7 +105,7 @@ impl Device {
     /// This method is used to write to the brightness file containted in /sys/class/backlight/ dir of the respective detected device.\
     /// It takes in a brightness value, and writes to othe relavant brightness file.
     pub fn write_value(&self, value: u16) {
-        fs::write(format!("{BLDIR}/{}/brightness",self.name), format!("{value}"))
+        fs::write(format!("{}/brightness",self.device_dir), format!("{value}"))
             .expect("Couldn't write to brightness file");
     }
 
@@ -252,28 +262,68 @@ Examples:
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::error::Error;
+    const TESTDIR: &str = "tests/testbldir";
 
     #[test]
-    fn detecting_device() {
-        let name = Device::detect_device();
+    fn detecting_device_nvidia() {
+        clean_up();
+        setup_test_env(&["nvidia_0","generic"]).unwrap();
+        let name = Device::detect_device(TESTDIR);
         assert!(name.is_some());
-        println!("Detected device name: {}",name.unwrap());
+        assert_eq!(name.unwrap(),"nvidia_0");
+        clean_up();
+    }
+
+    #[test]
+    fn detecting_device_amd() {
+        clean_up();
+        setup_test_env(&["nvidia_0","generic","amdgpu_x"]).unwrap();
+        let name = Device::detect_device(TESTDIR);
+        assert!(name.is_some());
+        assert_eq!(name.unwrap(),"amdgpu_x");
+        clean_up();
+    }
+
+    #[test]
+    fn detecting_device_acpi() {
+        clean_up();
+        setup_test_env(&["acpi_video0","generic"]).unwrap();
+        let name = Device::detect_device(TESTDIR);
+        assert!(name.is_some());
+        assert_eq!(name.unwrap(),"acpi_video0");
+        clean_up();
+    }
+
+    #[test]
+    fn detecting_device_fallback() {
+        clean_up();
+        setup_test_env(&["generic"]).unwrap();
+        let name = Device::detect_device(TESTDIR);
+        assert!(name.is_some());
+        assert_eq!(name.unwrap(),"generic");
+        clean_up();
     }
 
     #[test]
     fn writing_value() {
-        let d = Device::new().unwrap();
-        d.write_value(50);
-        let r = fs::read_to_string(format!("{BLDIR}/{}/brightness",d.name)).expect("failed to read during test");
+        clean_up();
+        setup_test_env(&["generic"]).unwrap();
+        let d = Device { name: "generic".to_string(), max:100, current: 50, device_dir: format!("{TESTDIR}/generic") };
+        d.write_value(100);
+        let r = fs::read_to_string(format!("{TESTDIR}/generic/brightness")).expect("failed to read test backlight value");
         let res = r.trim();
-        assert_eq!("50",res,"Result was {res}")
+        assert_eq!("100",res,"Result was {res}");
+        clean_up();
     }
 
     #[test]
     fn current_value() {
-        let current = block_on(Device::get_current("nvidia_0"));
-        let expected = fs::read_to_string(format!("{BLDIR}/nvidia_0/brightness")).unwrap();
-        assert_eq!(current.to_string(),expected.trim())
+        clean_up();
+        setup_test_env(&["generic"]).unwrap();
+        let current = block_on(Device::get_current(&format!("{TESTDIR}/generic")));
+        assert_eq!(current.to_string(),"50");
+        clean_up();
     }
 
     #[test]
@@ -298,6 +348,22 @@ mod tests {
     fn dec_calculation_max() {
         let ch = calculate_change(10, 100, 20, &Direction::Dec);
         assert_eq!(ch, 0)
+    }
+
+    fn setup_test_env(dirs: &[&str]) -> Result<(),Box<dyn Error>> {
+        fs::create_dir(format!("{TESTDIR}"))?;
+        for dir in dirs {
+            fs::create_dir(format!("tests/testbldir/{dir}"))?;
+            fs::write(format!("tests/testbldir/{dir}/brightness"), "50")?;
+            fs::write(format!("tests/testbldir/{dir}/max"), "100")?;
+        }
+        Ok(())
+    }
+
+    fn clean_up() {
+        if fs::read_dir("tests/").unwrap().count() > 0 {
+            fs::remove_dir_all("tests/testbldir").expect("Failed to clean up testing backlight directory.")
+        }
     }
 
 }
