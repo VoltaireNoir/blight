@@ -16,11 +16,11 @@ Set custom shortcuts using your distro settings or pair it with a hotkey daemon 
 ### Commands
 - Display status `blight status`
 - Display help `blight`
-- Increase brightness `blight inc` | `blight inc 5` (increases by 5%, instead of default 2%)
-- Decrease brightness `blight dec` | `blight dec 10` (decrease by 10%)
-- Increase brightness smoothly `blight sweep-up` | `blight sweep-up 20`
-- Decrease brightness smoothly `blight sweep-down` | `blight sweep-down 20`
-- Set custom brightness value `blight set val` | `blight set 50`
+- Increase brightness `blight inc` OR `blight inc 5` (increases by 5%, instead of default 2%)
+- Decrease brightness `blight dec` OR `blight dec 10` (decrease by 10%)
+- Increase brightness smoothly `blight sweep-up` OR `blight sweep-up 20`
+- Decrease brightness smoothly `blight sweep-down` OR `blight sweep-down 20`
+- Set custom brightness value `blight set val` OR `blight set 50`
 
 ## Install
 ### Using Cargo
