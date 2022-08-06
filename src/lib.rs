@@ -112,10 +112,20 @@ impl Device {
         current
     }
     /// This method is used to write to the brightness file containted in /sys/class/backlight/ dir of the respective detected device.\
-    /// It takes in a brightness value, and writes to othe relavant brightness file.
+    /// It takes in a brightness value, and writes to othe relavant brightness file. If it fails, it prints the error message with a helpful tip
+    /// to stderr.
     pub fn write_value(&self, value: u16) {
-        fs::write(format!("{}/brightness",self.device_dir), format!("{value}"))
-            .expect("Couldn't write to brightness file");
+        if let Err(err) = fs::write(format!("{}/brightness",self.device_dir), format!("{value}")) {
+            let tip = format!("\
+Make sure you have write permissions for the file '{BLDIR}/{}/brightness'
+Visit https://wiki.archlinux.org/title/Backlight#Hardware_interfaces
+if you're unsure what to do.",self.name).green();
+            eprintln!(
+                "Error: {}\nTip: {}",
+                err.to_string().red(),
+                tip,
+            )
+        }
     }
 
 }
