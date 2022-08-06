@@ -147,7 +147,6 @@ impl ErrorHandler for Option<Device> {
         self.unwrap_or_else(|| {
             println!("{}", "Error: No known device detected on system".red().bold());
             process::exit(1)
-
         })
     }
 }
@@ -242,14 +241,27 @@ pub fn is_running() -> bool {
     }
 }
 
+fn check_write_perm(device_name: &str, bldir: &str) -> Result<(), std::io::Error> {
+    let path = format!("{bldir}/{device_name}/brightness");
+    fs::read_to_string(&path)
+        .and_then(|contents| fs::write(&path, contents))
+        .and(Ok(()))
+}
+
 /// This function creates a Device instance and prints the detected device, along with its current and max brightness values.
 pub fn print_status() {
     let device = Device::new().err_handler();
 
+    let write_perm = match check_write_perm(&device.name, BLDIR) {
+        Ok(_) => "Ok".green(),
+        Err(err) => format!("{err}").red(),
+    };
+
     println!(
-        "{}\nDetected device: {}\nCurrent Brightness: {}\nMax Brightness {}",
+        "{}\nDetected device: {}\nWrite Permission: {}\nCurrent Brightness: {}\nMax Brightness {}",
         "Device status".bold(),
         device.name.green(),
+        write_perm,
         device.current.to_string().green(),
         device.max.to_string().green()
     );
@@ -368,6 +380,20 @@ mod tests {
     fn dec_calculation_max() {
         let ch = calculate_change(10, 100, 20, &Direction::Dec);
         assert_eq!(ch, 0)
+    }
+
+    #[test]
+    #[should_panic]
+    fn write_permission_not_ok() {
+        clean_up();
+        setup_test_env(&["generic"]).unwrap();
+        fs::File::open(format!("{TESTDIR}/generic/brightness"))
+            .and_then(|f| {
+                let mut p = f.metadata().unwrap().permissions();
+                p.set_readonly(true);
+                f.set_permissions(p)
+            });
+        check_write_perm("generic", TESTDIR).unwrap()
     }
 
     fn setup_test_env(dirs: &[&str]) -> Result<(),Box<dyn Error>> {
