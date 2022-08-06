@@ -145,7 +145,7 @@ impl ErrorHandler for Option<Device> {
     type ReturnTarget = Device;
     fn err_handler(self) -> Self::ReturnTarget {
         self.unwrap_or_else(|| {
-            println!("{}", "Error: No known device detected on system".red().bold());
+            eprintln!("{}", "Error: No known device detected on system".red().bold());
             process::exit(1)
         })
     }
@@ -155,7 +155,7 @@ impl ErrorHandler for Result<u16, std::num::ParseIntError> {
     type ReturnTarget = u16;
     fn err_handler(self) -> Self::ReturnTarget {
         self.unwrap_or_else(|_| {
-            println!("{}", "Invalid step size: use a positive integer".red().bold());
+            eprintln!("{}", "Invalid step size: use a positive integer".red().bold());
             process::exit(1)
         })
     }
