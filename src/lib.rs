@@ -136,19 +136,39 @@ pub fn calculate_change(current: u16, max: u16, step_size: u16, dir: &Direction)
     }
 }
 
+trait ErrorHandler {
+    type ReturnTarget: ?Sized;
+    fn err_handler(self) -> Self::ReturnTarget;
+}
+
+impl ErrorHandler for Option<Device> {
+    type ReturnTarget = Device;
+    fn err_handler(self) -> Self::ReturnTarget {
+        self.unwrap_or_else(|| {
+            println!("{}", "Error: No known device detected on system".red().bold());
+            process::exit(1)
+
+        })
+    }
+}
+
+impl ErrorHandler for Result<u16, std::num::ParseIntError> {
+    type ReturnTarget = u16;
+    fn err_handler(self) -> Self::ReturnTarget {
+        self.unwrap_or_else(|_| {
+            println!("{}", "Invalid step size: use a positive integer".red().bold());
+            process::exit(1)
+        })
+    }
+}
+
 /// Changes backlight based on step-size (percentage), change type and direction.
 /// Regular change uses calculated change value based on step size and is applied instantly
 /// Sweep change on the other hand, occurs gradually, producing a fade or sweeping effect.
 pub fn change_bl(step_size: &str, ch: Change, dir: Direction) {
-    let step_size: u16 = step_size.parse().unwrap_or_else(|_| {
-        println!("{}", "Invalid step size: use a positive integer".red().bold());
-        process::exit(1)
-    });
+    let step_size: u16 = step_size.parse().err_handler();
 
-    let device = Device::new().unwrap_or_else(|| {
-        println!("{}", "Error: No known device detected on system".red().bold());
-        process::exit(1)
-    });
+    let device = Device::new().err_handler();
 
     let change = calculate_change(device.current, device.max, step_size, &dir);
     if change != device.current {
@@ -163,15 +183,9 @@ pub fn change_bl(step_size: &str, ch: Change, dir: Direction) {
 /// as long as the given value falls under the min and max bounds.
 /// Unlike change_bl, this function does not calculate any change, it writes the given value directly.
 pub fn set_bl(val: &str) {
-    let val: u16 = val.parse().unwrap_or_else(|_| {
-        println!("{}", "Invalid value: use a positive integer".red().bold());
-        process::exit(1)
-    });
+    let val: u16 = val.parse().err_handler();
 
-    let device = Device::new().unwrap_or_else(|| {
-        println!("{}", "Error: No known device detected on system".red());
-        process::exit(1)
-    });
+    let device = Device::new().err_handler();
 
     if (val <= device.max) & (val != device.current) {
         device.write_value(val);
@@ -230,10 +244,7 @@ pub fn is_running() -> bool {
 
 /// This function creates a Device instance and prints the detected device, along with its current and max brightness values.
 pub fn print_status() {
-    let device = Device::new().unwrap_or_else(|| {
-        println!("{}", "Error: No known device detected on system".red());
-        process::exit(1)
-    });
+    let device = Device::new().err_handler();
 
     println!(
         "{}\nDetected device: {}\nCurrent Brightness: {}\nMax Brightness {}",
