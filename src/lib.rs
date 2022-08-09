@@ -294,7 +294,7 @@ pub fn print_devices() {
 /// This function prints helpful information about the CLI, such as available commands and examples.
 pub fn print_help() {
     let title = "blight: A backlight utility that plays well with hybrid GPUs";
-    let quote = "\"And man said, \"let there b-light\" and there was light.\" - Some Book 1:3";
+    let quote = "\"And man said, \'let there b-light\' and there was light.\" - Some Book 1:3";
     let commands = "\
 opt -> Optional, val -> Value, dev -> Device name
 
