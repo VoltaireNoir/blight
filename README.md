@@ -6,6 +6,7 @@
 > "And man said, 'let there b-light' and there was light." - Some Book 1:3
 
 ![Generated using Dall-E 2](blightm.png)
+*(Credits: Sneha Sundar, for generating this lovely image for blight using DALL·E 2)*
 ## Screenshots
 ![](blight.png)
 ![](blight2.png)
