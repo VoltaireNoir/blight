@@ -1,5 +1,5 @@
 //! # About
-//! **blight is a hassle-free CLI for managing backlight on Linux laptops with hybrid GPU configuration.** \
+//! **blight is a hassle-free CLI for managing backlight on Linux; one that plays well with hybrid GPU configuration and proprietary drivers..** \
 //! \
 //! > **Note:** You need write permission for the file `/sys/class/backlight/{your_device}/brightness` for this utility to work.
 //! > Read more about it [here](https://wiki.archlinux.org/title/Backlight#ACPI).
@@ -119,8 +119,7 @@ impl Device {
         current
     }
     /// This method is used to write to the brightness file containted in /sys/class/backlight/ dir of the respective detected device.\
-    /// It takes in a brightness value, and writes to othe relavant brightness file. If it fails, it prints the error message with a helpful tip
-    /// to stderr.
+    /// It takes in a brightness value, and writes to othe relavant brightness file.
     pub fn write_value(&self, value: u16) {
         if let Err(err) = fs::write(format!("{}/brightness",self.device_dir), format!("{value}")) {
             let tip = format!("\
@@ -283,6 +282,7 @@ pub fn print_status() {
     );
 }
 
+/// Reads backlight directory (sys/class/backlight) and prints it's contents
 pub fn print_devices() {
     println!("{}","Detected Devices:".bold());
     fs::read_dir(BLDIR)
@@ -294,23 +294,30 @@ pub fn print_devices() {
 
 /// This function prints helpful information about the CLI, such as available commands and examples.
 pub fn print_help() {
-    let title = "blight automatically detects GPU device, and updates brightness accordingly.";
+    let title = "blight: A backlight utility that plays well with hybrid GPUs";
+    let quote = "\"And man said, \"let there b-light\" and there was light.\" - Some Book 1:3";
     let commands = "\
-blight inc [opt val] - increase by 2%
-blight dec [opt val] - decrease by 2%
-blight set [val] - set custom brightness value
-blight sweep-up [opt val] - smoothly increase by 10%
-blight sweep-down [opt val] - smoothly decrease by 10%
-blight status - backlight device status";
+opt -> Optional, val -> Value, dev -> Device name
+
+ blight inc [opt val] [opt dev] -> increase by 2%
+ blight dec [opt val] [opt dev] -> decrease by 2%
+ blight set [val] [opt dev] -> set custom brightness value
+ blight sweep-up [opt val] [opt dev] -> smoothly increase by 10%
+ blight sweep-down [opt val] [opt dev] -> smoothly decrease by 10%
+ blight status -> default backlight device status
+ blight list -> list all backlight devices";
+
     let exampels = "\
 Examples:
     blight inc (increases brightness by 2% - default step size)
     blight dec 10 (increases brightness by 10%)
-    blight sweep-up 15 (smoothly increases brightness by 15%)";
+    blight sweep-up 15 (smoothly increases brightness by 15%)
+    blight inc 2 nvidia_0 (increases nvidia_0's brightness by 2%)";
 
     println!(
-        "{}\n\n{}\n\n{}",
+        "{}\n\n{}\n\n{}\n\n{}",
         title.blue().bold(),
+        quote,
         commands.green().bold(),
         exampels.bright_yellow()
     );
