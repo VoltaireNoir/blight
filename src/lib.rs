@@ -409,7 +409,6 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn write_permission_not_ok() {
         clean_up();
         setup_test_env(&["generic"]).unwrap();
@@ -418,8 +417,9 @@ mod tests {
                 let mut p = f.metadata().unwrap().permissions();
                 p.set_readonly(true);
                 f.set_permissions(p)
-            });
-        check_write_perm("generic", TESTDIR).unwrap()
+            }).unwrap();
+        assert!(check_write_perm("generic", TESTDIR).is_err());
+        clean_up();
     }
 
     fn setup_test_env(dirs: &[&str]) -> Result<(),Box<dyn Error>> {
