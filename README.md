@@ -2,10 +2,11 @@
 [![Rust](https://github.com/VoltaireNoir/blight/actions/workflows/rust.yml/badge.svg)](https://github.com/VoltaireNoir/blight/actions/workflows/rust.yml)
 [![Crates.io](https://img.shields.io/crates/v/blight)](https://crates.io/crates/blight)
 #### _A hassle-free CLI utility to manage backlight on Linux; one that plays well with hybrid GPU configuration and proprietary drivers._
+
+> "And man said, 'let there b-light' and there was light." - Some Book 1:3
+
 ![Generated using Dall-E 2](blightm.png)
-
-> "And man said, "let there b-light," and there was light." - Some Book 1:3
-
+## Screenshots
 ![](blight.png)
 ![](blight2.png)
 ## About
