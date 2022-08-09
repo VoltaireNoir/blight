@@ -285,7 +285,7 @@ pub fn print_status() {
     };
 
     println!(
-        "{}\nDetected device: {}\nWrite Permission: {}\nCurrent Brightness: {}\nMax Brightness {}",
+        "{}\nDetected device: {}\nWrite permission: {}\nCurrent brightness: {}\nMax brightness {}",
         "Device status".bold(),
         device.name.green(),
         write_perm,
