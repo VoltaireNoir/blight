@@ -30,7 +30,8 @@ Set custom shortcuts using your distro settings or pair it with a hotkey daemon 
 - Decrease brightness smoothly `blight sweep-down` OR `blight sweep-down 20`
 - Set custom brightness value ``blight set val``
 - Increase brightness for specific device `blight inc 2 nvidia_0`
-Note: When specifying a device name, you need to specify optional values too (if the command accepts them).
+
+Note: When specifying a device name, you need to specify optional values too if the command accepts them (see above example).
 
 ## Install
 ### Using Cargo
