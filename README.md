@@ -6,6 +6,7 @@
 
 #### _A hassle-free CLI utility to manage backlight on Linux; one that plays well with hybrid GPU configuration and proprietary drivers._
 ![](blight.png)
+![](blight2.png)
 ## About
 > **Warning**
 > For this program to run without root privileges, the user needs to be in the video group and might need udev rules to allow write access to brightness files. Read more about it [here](https://wiki.archlinux.org/title/Backlight#ACPI). If you do not have write permissions, then you'd have to run the program with `sudo`.
