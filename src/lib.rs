@@ -141,7 +141,7 @@ if you're unsure what to do.",self.name).green();
 }
 
 fn detect_devices(bldir: &str) -> Vec<OsString> {
-    let dirs: Vec<OsString> = fs::read_dir(bldir)
+    fs::read_dir(bldir)
         .expect("Couldn't read backlight directory")
         .filter(|d| {
             let mut p = d.as_ref().unwrap().path();
@@ -149,8 +149,7 @@ fn detect_devices(bldir: &str) -> Vec<OsString> {
             p.exists()
         })
         .map(|d| d.unwrap().file_name())
-        .collect();
-    dirs
+        .collect::<Vec<OsString>>()
 }
 
 /// Calculates the new value to be written to the brightness file based on the provided step-size (percentage) and direction,
