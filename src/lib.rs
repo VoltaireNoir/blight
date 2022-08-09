@@ -298,13 +298,13 @@ pub fn print_help() {
     let commands = "\
 opt -> Optional, val -> Value, dev -> Device name
 
- blight inc [opt val] [opt dev] -> increase by 2%
- blight dec [opt val] [opt dev] -> decrease by 2%
- blight set [val] [opt dev] -> set custom brightness value
- blight sweep-up [opt val] [opt dev] -> smoothly increase by 10%
- blight sweep-down [opt val] [opt dev] -> smoothly decrease by 10%
- blight status -> default backlight device status
- blight list -> list all backlight devices";
+blight inc [opt val] [opt dev] -> increase by 2%
+blight dec [opt val] [opt dev] -> decrease by 2%
+blight set [val] [opt dev] -> set custom brightness value
+blight sweep-up [opt val] [opt dev] -> smoothly increase by 10%
+blight sweep-down [opt val] [opt dev] -> smoothly decrease by 10%
+blight status -> default backlight device status
+blight list -> list all backlight devices";
 
     let exampels = "\
 Examples:
