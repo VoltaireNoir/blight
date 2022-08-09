@@ -23,6 +23,7 @@ fn main() {
             [case] if case == "sweep-up" => blight::change_bl("10", sweep, inc),
             [case] if case == "sweep-down" => blight::change_bl("10", sweep, dec),
             [case] if case == "status" => blight::print_status(),
+            [case] if case == "list" => blight::print_devices(),
             _ => blight::print_help(),
         }
     } else {

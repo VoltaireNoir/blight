@@ -294,6 +294,13 @@ pub fn print_status() {
     );
 }
 
+pub fn print_devices() {
+    println!("{}","Detected Devices:".bold());
+    for d in detect_devices(BLDIR) {
+        println!("{}",d.into_string().unwrap().green())
+    }
+}
+
 /// This function prints helpful information about the CLI, such as available commands and examples.
 pub fn print_help() {
     let title = "blight automatically detects GPU device, and updates brightness accordingly.";
