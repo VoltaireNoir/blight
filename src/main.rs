@@ -1,32 +1,53 @@
-use blight::{Change, Direction};
-use std::env;
+use blight::{
+    Change::{Regular,Sweep},
+    Direction::{Dec,Inc},
+};
+use std::env::{self,Args};
 
 fn main() {
     if blight::is_running() {
         return;
     }
+    argument_parser(env::args());
+}
 
-    let args: Vec<String> = env::args().collect();
-    let (inc, dec) = (Direction::Inc, Direction::Dec);
-    let (reg, sweep) = (Change::Regular, Change::Sweep);
-
-    if args.len() > 1 {
-        match &args[1..] {
-            [dir, value] if dir == "inc" => blight::change_bl(value, reg, inc),
-            [dir, value] if dir == "dec" => blight::change_bl(value, reg, dec),
-            [case, value] if case == "set" => blight::set_bl(value),
-            [case, value] if case == "set" => blight::set_bl(value),
-            [case, value] if case == "sweep-up" => blight::change_bl(value, sweep, inc),
-            [case, value] if case == "sweep-down" => blight::change_bl(value, sweep, dec),
-            [dir] if dir == "inc" => blight::change_bl("2", reg, inc),
-            [dir] if dir == "dec" => blight::change_bl("2", reg, dec),
-            [case] if case == "sweep-up" => blight::change_bl("10", sweep, inc),
-            [case] if case == "sweep-down" => blight::change_bl("10", sweep, dec),
-            [case] if case == "status" => blight::print_status(),
-            [case] if case == "list" => blight::print_devices(),
+fn argument_parser(mut args: Args) {
+    if let Some(arg) = args.next().and_then(|_| args.next()) {
+        match &arg[..] {
+            "status" => blight::print_status(),
+            "list" => blight::print_devices(),
+            "set" => {
+                if let Some(v) = args.next() { blight::set_bl(&v) }
+            },
+            "inc" => {
+                if let Some(v) = args.next() {
+                    blight::change_bl(&v, Regular, Inc)
+                } else {
+                    blight::change_bl("2", Regular, Inc)
+                }
+            },
+            "dec" => {
+                if let Some(v) = args.next() {
+                    blight::change_bl(&v, Regular, Dec)
+                } else {
+                    blight::change_bl("2", Regular, Dec)
+                }
+            },
+            "sweep-up" => {
+                if let Some(v) = args.next() {
+                    blight::change_bl(&v, Sweep, Inc)
+                } else {
+                    blight::change_bl("10", Sweep, Inc)
+                }
+            },
+            "sweep-down" => {
+                if let Some(v) = args.next() {
+                    blight::change_bl(&v, Sweep, Dec)
+                } else {
+                    blight::change_bl("10", Sweep, Dec)
+                }
+            },
             _ => blight::print_help(),
         }
-    } else {
-        blight::print_help();
     }
 }
