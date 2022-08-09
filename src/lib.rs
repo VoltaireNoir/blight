@@ -21,6 +21,7 @@ use std::{
     thread,
     process::{self, Command},
     time::Duration,
+    ffi::OsString,
 };
 
 const BLDIR: &str = "/sys/class/backlight";
@@ -52,8 +53,11 @@ impl Device {
     /// Creates a new Device instance by reading values from /sys/class/backlight/ directory based on the detected GPU device.\
     /// Returns the Device struct wrapped in Some() or returns None when no known device is detected \
     /// This is how the devices are priorirized AmdGPU or Intel > Nvdia > ACPI > Any Fallback Device
-    pub fn new() -> Option<Device> {
-        let name = Self::detect_device(BLDIR)?;
+    pub fn new(name: Option<String>) -> Option<Device> {
+        let name = match name {
+            Some(n) => n,
+            None => Self::detect_device(BLDIR)?,
+        };
         Some(block_on(Self::load(name)))
     }
 
@@ -130,6 +134,19 @@ if you're unsure what to do.",self.name).green();
 
 }
 
+fn detect_devices(bldir: &str) -> Vec<OsString> {
+    let dirs: Vec<OsString> = fs::read_dir(bldir)
+        .expect("Couldn't read backlight directory")
+        .filter(|d| {
+            let mut p = d.as_ref().unwrap().path();
+            p.push("brightness");
+            p.exists()
+        })
+        .map(|d| d.unwrap().file_name())
+        .collect();
+    dirs
+}
+
 /// Calculates the new value to be written to the brightness file based on the provided step-size (percentage) and direction,
 /// for the given current and max values of the detected GPU device.
 pub fn calculate_change(current: u16, max: u16, step_size: u16, dir: &Direction) -> u16 {
@@ -177,7 +194,7 @@ impl ErrorHandler for Result<u16, std::num::ParseIntError> {
 pub fn change_bl(step_size: &str, ch: Change, dir: Direction) {
     let step_size: u16 = step_size.parse().err_handler();
 
-    let device = Device::new().err_handler();
+    let device = Device::new(None).err_handler();
 
     let change = calculate_change(device.current, device.max, step_size, &dir);
     if change != device.current {
@@ -194,7 +211,7 @@ pub fn change_bl(step_size: &str, ch: Change, dir: Direction) {
 pub fn set_bl(val: &str) {
     let val: u16 = val.parse().err_handler();
 
-    let device = Device::new().err_handler();
+    let device = Device::new(None).err_handler();
 
     if (val <= device.max) & (val != device.current) {
         device.write_value(val);
@@ -260,7 +277,7 @@ fn check_write_perm(device_name: &str, bldir: &str) -> Result<(), std::io::Error
 
 /// This function creates a Device instance and prints the detected device, along with its current and max brightness values.
 pub fn print_status() {
-    let device = Device::new().err_handler();
+    let device = Device::new(None).err_handler();
 
     let write_perm = match check_write_perm(&device.name, BLDIR) {
         Ok(_) => "Ok".green(),
@@ -344,6 +361,24 @@ mod tests {
         let name = Device::detect_device(TESTDIR);
         assert!(name.is_some());
         assert_eq!(name.unwrap(),"generic");
+        clean_up();
+    }
+
+    #[test]
+    fn detecting_devices() {
+        clean_up();
+        setup_test_env(&["generic","nvidia"]).unwrap();
+        fs::create_dir(format!("{TESTDIR}/control")).unwrap();
+        let devices = detect_devices(TESTDIR);
+        assert_eq!(devices.len(),2);
+        clean_up();
+    }
+
+    #[test]
+    fn detecting_devices_name() {
+        clean_up();
+        setup_test_env(&["generic"]).unwrap();
+        assert_eq!(detect_devices(TESTDIR)[0].as_os_str(),"generic");
         clean_up();
     }
 
