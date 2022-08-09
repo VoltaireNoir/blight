@@ -21,7 +21,6 @@ use std::{
     thread,
     process::{self, Command},
     time::Duration,
-    ffi::OsString,
     path::PathBuf,
 };
 
@@ -81,7 +80,6 @@ impl Device {
         let dirs = fs::read_dir(bldir).expect("Failed to read dir");
         let mut nv: bool = false;
         let mut acpi: bool = false;
-        let mut count: u8 = 0;
         let mut fallback = String::new();
 
         for entry in dirs {
@@ -95,14 +93,12 @@ impl Device {
                 }
                 fallback = name.to_string();
             }
-            count += 1;
         };
-
-        if count == 0 { return None }
 
         if nv { Some(String::from("nvidia_0")) }
         else if acpi { Some(String::from("acpi_video0")) }
-        else { Some(fallback) }
+        else if !fallback.is_empty() { Some(fallback) }
+        else { return None }
     }
 
     async fn get_max(device_dir: &str) -> u16 {
@@ -138,18 +134,6 @@ if you're unsure what to do.",self.name).green();
             )
         }
     }
-}
-
-fn detect_devices(bldir: &str) -> Vec<OsString> {
-    fs::read_dir(bldir)
-        .expect("Couldn't read backlight directory")
-        .filter(|d| {
-            let mut p = d.as_ref().unwrap().path();
-            p.push("brightness");
-            p.exists()
-        })
-        .map(|d| d.unwrap().file_name())
-        .collect::<Vec<OsString>>()
 }
 
 /// Calculates the new value to be written to the brightness file based on the provided step-size (percentage) and direction,
@@ -301,9 +285,11 @@ pub fn print_status() {
 
 pub fn print_devices() {
     println!("{}","Detected Devices:".bold());
-    for d in detect_devices(BLDIR) {
-        println!("{}",d.into_string().unwrap().green())
-    }
+    fs::read_dir(BLDIR)
+        .expect("Failed to read Backlight Directory")
+        .for_each(|d| {
+            println!("{}", d.unwrap().file_name().to_string_lossy().green())
+        });
 }
 
 /// This function prints helpful information about the CLI, such as available commands and examples.
@@ -376,23 +362,6 @@ mod tests {
         clean_up();
     }
 
-    #[test]
-    fn detecting_devices() {
-        clean_up();
-        setup_test_env(&["generic","nvidia"]).unwrap();
-        fs::create_dir(format!("{TESTDIR}/control")).unwrap();
-        let devices = detect_devices(TESTDIR);
-        assert_eq!(devices.len(),2);
-        clean_up();
-    }
-
-    #[test]
-    fn detecting_devices_name() {
-        clean_up();
-        setup_test_env(&["generic"]).unwrap();
-        assert_eq!(detect_devices(TESTDIR)[0].as_os_str(),"generic");
-        clean_up();
-    }
 
     #[test]
     fn writing_value() {
