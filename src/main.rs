@@ -17,34 +17,34 @@ fn argument_parser(mut args: Args) {
             "status" => blight::print_status(),
             "list" => blight::print_devices(),
             "set" => {
-                if let Some(v) = args.next() { blight::set_bl(&v) }
+                if let Some(v) = args.next() { blight::set_bl(&v, args.next()) }
             },
             "inc" => {
                 if let Some(v) = args.next() {
-                    blight::change_bl(&v, Regular, Inc)
+                    blight::change_bl(&v, Regular, Inc, args.next())
                 } else {
-                    blight::change_bl("2", Regular, Inc)
+                    blight::change_bl("2", Regular, Inc, args.next())
                 }
             },
             "dec" => {
                 if let Some(v) = args.next() {
-                    blight::change_bl(&v, Regular, Dec)
+                    blight::change_bl(&v, Regular, Dec, args.next())
                 } else {
-                    blight::change_bl("2", Regular, Dec)
+                    blight::change_bl("2", Regular, Dec, args.next())
                 }
             },
             "sweep-up" => {
                 if let Some(v) = args.next() {
-                    blight::change_bl(&v, Sweep, Inc)
+                    blight::change_bl(&v, Sweep, Inc, args.next())
                 } else {
-                    blight::change_bl("10", Sweep, Inc)
+                    blight::change_bl("10", Sweep, Inc, args.next())
                 }
             },
             "sweep-down" => {
                 if let Some(v) = args.next() {
-                    blight::change_bl(&v, Sweep, Dec)
+                    blight::change_bl(&v, Sweep, Dec, args.next())
                 } else {
-                    blight::change_bl("10", Sweep, Dec)
+                    blight::change_bl("10", Sweep, Dec, args.next())
                 }
             },
             _ => blight::print_help(),

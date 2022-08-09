@@ -22,6 +22,7 @@ use std::{
     process::{self, Command},
     time::Duration,
     ffi::OsString,
+    path::PathBuf,
 };
 
 const BLDIR: &str = "/sys/class/backlight";
@@ -55,7 +56,13 @@ impl Device {
     /// This is how the devices are priorirized AmdGPU or Intel > Nvdia > ACPI > Any Fallback Device
     pub fn new(name: Option<String>) -> Option<Device> {
         let name = match name {
-            Some(n) => n,
+            Some(n) => {
+                if PathBuf::from(format!("{BLDIR}/{n}/brightness")).is_file() {
+                    n
+                } else {
+                    return None
+                }
+            },
             None => Self::detect_device(BLDIR)?,
         };
         Some(block_on(Self::load(name)))
@@ -131,7 +138,6 @@ if you're unsure what to do.",self.name).green();
             )
         }
     }
-
 }
 
 fn detect_devices(bldir: &str) -> Vec<OsString> {
@@ -191,10 +197,10 @@ impl ErrorHandler for Result<u16, std::num::ParseIntError> {
 /// Changes backlight based on step-size (percentage), change type and direction.
 /// Regular change uses calculated change value based on step size and is applied instantly
 /// Sweep change on the other hand, occurs gradually, producing a fade or sweeping effect.
-pub fn change_bl(step_size: &str, ch: Change, dir: Direction) {
+pub fn change_bl(step_size: &str, ch: Change, dir: Direction, device_name: Option<String>) {
     let step_size: u16 = step_size.parse().err_handler();
 
-    let device = Device::new(None).err_handler();
+    let device = Device::new(device_name).err_handler();
 
     let change = calculate_change(device.current, device.max, step_size, &dir);
     if change != device.current {
@@ -208,10 +214,10 @@ pub fn change_bl(step_size: &str, ch: Change, dir: Direction) {
 /// This function takes a brightness value, creates a Device struct, and writes the value to the brightness file
 /// as long as the given value falls under the min and max bounds.
 /// Unlike change_bl, this function does not calculate any change, it writes the given value directly.
-pub fn set_bl(val: &str) {
+pub fn set_bl(val: &str, device_name: Option<String>) {
     let val: u16 = val.parse().err_handler();
 
-    let device = Device::new(None).err_handler();
+    let device = Device::new(device_name).err_handler();
 
     if (val <= device.max) & (val != device.current) {
         device.write_value(val);
