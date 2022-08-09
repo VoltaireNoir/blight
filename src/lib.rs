@@ -54,15 +54,14 @@ impl Device {
     /// Returns the Device struct wrapped in Some() or returns None when no known device is detected \
     /// This is how the devices are priorirized AmdGPU or Intel > Nvdia > ACPI > Any Fallback Device
     pub fn new(name: Option<String>) -> Option<Device> {
-        let name = match name {
-            Some(n) => {
-                if PathBuf::from(format!("{BLDIR}/{n}/brightness")).is_file() {
-                    n
-                } else {
-                    return None
-                }
-            },
-            None => Self::detect_device(BLDIR)?,
+        let name = if let Some(n) = name {
+            if PathBuf::from(format!("{BLDIR}/{n}/brightness")).is_file() {
+                n
+            } else {
+                return None
+            }
+        } else {
+            Self::detect_device(BLDIR)?
         };
         Some(block_on(Self::load(name)))
     }
