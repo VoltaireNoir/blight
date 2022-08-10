@@ -234,13 +234,25 @@ pub fn sweep(device: &Device, change: u16, dir: &Direction) {
 }
 
 pub fn save(device_name: Option<String>) {
-    let mut save = PathBuf::from(env::var("HOME").unwrap() + SAVEDIR);
-    if !save.exists() {
-        fs::create_dir_all(&save).expect("failed to create save dir");
+    let mut savedir = PathBuf::from(env::var("HOME").unwrap() + SAVEDIR);
+
+    if !savedir.exists() {
+        fs::create_dir_all(&savedir)
+            .unwrap_or_else(|_| {
+                eprintln!("{} {}","Error: Failed to create save directory at".red().bold(),savedir.display())
+            })
     }
+
     let device = Device::new(device_name).err_handler();
-    save.push("blight.save");
-    fs::write(save, format!("{} {}",device.name, device.current)).expect("Failed to write save file");
+    savedir.push("blight.save");
+
+    fs::write(&savedir, format!("{} {}",device.name, device.current))
+        .unwrap_or_else(|_| {
+            eprintln!("{} {}","Error: Failed to write to save file at".red().bold(),savedir.display());
+            return
+    });
+
+    println!("{}","Current brightness successfully saved".green())
 }
 
 pub fn restore() {
