@@ -257,16 +257,37 @@ pub fn save(device_name: Option<String>) {
 
 pub fn restore() {
     let save = PathBuf::from((env::var("HOME").unwrap() + SAVEDIR) + "/blight.save");
-    let restore = if save.is_file() {
-        fs::read_to_string(save).unwrap()
+    let restore;
+
+    if save.is_file() {
+        match fs::read_to_string(save) {
+            Ok(s) => restore = s,
+            Err(err) => {
+                eprintln!("{} ({})","Error: Failed to read from save file", err);
+                return
+            }
+        }
     } else {
-        eprintln!("Failed to restore from previous save.");
+        eprintln!("{}\n{}","Error: No saved state found".red().bold(),
+                  "Tip: Try using `blight save` first".yellow());
         return;
-    };
+    }
+
     let (device_name, val) = restore.split_once(" ").unwrap();
     let device = Device::new(Some(device_name.to_string())).err_handler();
-    let val: u16 = val.parse().unwrap();
-    device.write_value(val);
+    let value: u16;
+
+    match val.parse() {
+        Ok(v) => value = v,
+        Err(_) => {
+            eprintln!("{}\n{}","Error: Failed to parse saved brightness value.".red().bold(),
+                      "Tip: The saved state data might be corrupt. Try using `blight save` again.".yellow()
+            );
+            return
+        }
+    }
+    device.write_value(value);
+    println!("{}","Brightness successfully restored".green());
 }
 
 /// This function is the current way of determining whether another instance of blight is running.
