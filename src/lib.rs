@@ -25,6 +25,7 @@ use std::{
 };
 
 const BLDIR: &str = "/sys/class/backlight";
+const SAVEDIR: &str = "/.local/share/blight";
 
 /// This enum is used to specify the direction in which the backlight should be changed.
 /// Inc -> Increase, Dec -> Decrease.
@@ -230,6 +231,30 @@ pub fn sweep(device: &Device, change: u16, dir: &Direction) {
             }
         }
     }
+}
+
+pub fn save(device_name: Option<String>) {
+    let mut save = PathBuf::from(env::var("HOME").unwrap() + SAVEDIR);
+    if !save.exists() {
+        fs::create_dir_all(&save).expect("failed to create save dir");
+    }
+    let device = Device::new(device_name).err_handler();
+    save.push("blight.save");
+    fs::write(save, format!("{} {}",device.name, device.current)).expect("Failed to write save file");
+}
+
+pub fn restore() {
+    let save = PathBuf::from((env::var("HOME").unwrap() + SAVEDIR) + "/blight.save");
+    let restore = if save.is_file() {
+        fs::read_to_string(save).unwrap()
+    } else {
+        eprintln!("Failed to restore from previous save.");
+        return;
+    };
+    let (device_name, val) = restore.split_once(" ").unwrap();
+    let device = Device::new(Some(device_name.to_string())).err_handler();
+    let val: u16 = val.parse().unwrap();
+    device.write_value(val);
 }
 
 /// This function is the current way of determining whether another instance of blight is running.

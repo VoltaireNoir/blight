@@ -16,6 +16,8 @@ fn argument_parser(mut args: Args) {
         match &arg[..] {
             "status" => blight::print_status(args.next()),
             "list" => blight::print_devices(),
+            "save" => blight::save(args.next()),
+            "restore" => blight::restore(),
             "set" => {
                 if let Some(v) = args.next() { blight::set_bl(&v, args.next()) }
             },
