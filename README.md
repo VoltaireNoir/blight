@@ -22,7 +22,7 @@ In principle, blight should work on any GNU/Linux distro, and even on systems wi
 Set custom shortcuts using your distro settings or pair it with a hotkey daemon like [sxhkd](https://github.com/baskerville/sxhkd) and you'll be good to go. *blight* doesn't execute any code if another instance is already running, so do not worry about spamming the key that triggers it.
 
 ### Commands
-- Display status `blight status`
+- Display status `blight status` OR `blight status device_name`
 - Display help `blight`
 - List all backlight devices `blight list`
 - Increase brightness `blight inc` OR `blight inc 5` (increases by 5%, instead of default 2%)
