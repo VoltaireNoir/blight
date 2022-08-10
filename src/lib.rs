@@ -303,7 +303,7 @@ blight dec [opt val] [opt dev] -> decrease by 2%
 blight set [val] [opt dev] -> set custom brightness value
 blight sweep-up [opt val] [opt dev] -> smoothly increase by 10%
 blight sweep-down [opt val] [opt dev] -> smoothly decrease by 10%
-blight status -> default backlight device status
+blight status [opt dev] -> backlight device status
 blight list -> list all backlight devices";
 
     let exampels = "\
