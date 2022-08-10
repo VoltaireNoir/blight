@@ -141,8 +141,13 @@ Visit https://wiki.archlinux.org/title/Backlight#Hardware_interfaces
 if you're unsure what to do.",
                 self.name
             )
-            .green();
-            eprintln!("Error: {}\nTip: {}", err.to_string().red(), tip,)
+            .yellow();
+            eprintln!(
+                "{} {}\nTip: {}",
+                "Error:".red().bold(),
+                err.to_string().red().bold(),
+                tip,
+            )
         }
     }
 }
