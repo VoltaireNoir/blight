@@ -275,17 +275,13 @@ pub fn restore() {
 
     let (device_name, val) = restore.split_once(" ").unwrap();
     let device = Device::new(Some(device_name.to_string())).err_handler();
-    let value: u16;
 
-    match val.parse() {
-        Ok(v) => value = v,
-        Err(_) => {
-            eprintln!("{}\n{}","Error: Failed to parse saved brightness value.".red().bold(),
-                      "Tip: The saved state data might be corrupt. Try using `blight save` again.".yellow()
-            );
-            return
-        }
-    }
+    let value: u16 = if let Ok(v) = val.parse() {v} else {
+        eprintln!("{}\n{}","Error: Failed to parse saved brightness value.".red().bold(),
+                  "Tip: The saved state data might be corrupt. Try using `blight save` again.".yellow()
+        );
+        return
+    };
     device.write_value(value);
     println!("{}","Brightness successfully restored".green());
 }
