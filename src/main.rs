@@ -14,7 +14,7 @@ fn main() {
 fn argument_parser(mut args: Args) {
     if let Some(arg) = args.next().and_then(|_| args.next()) {
         match &arg[..] {
-            "status" => blight::print_status(),
+            "status" => blight::print_status(args.next()),
             "list" => blight::print_devices(),
             "set" => {
                 if let Some(v) = args.next() { blight::set_bl(&v, args.next()) }

@@ -263,8 +263,8 @@ fn check_write_perm(device_name: &str, bldir: &str) -> Result<(), std::io::Error
 }
 
 /// This function creates a Device instance and prints the detected device, along with its current and max brightness values.
-pub fn print_status() {
-    let device = Device::new(None).err_handler();
+pub fn print_status(device_name: Option<String>) {
+    let device = Device::new(device_name).err_handler();
 
     let write_perm = match check_write_perm(&device.name, BLDIR) {
         Ok(_) => "Ok".green(),
