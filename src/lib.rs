@@ -16,12 +16,11 @@
 use colored::*;
 use futures::executor::block_on;
 use std::{
-    fs,
-    env,
-    thread,
-    process::{self, Command},
-    time::Duration,
+    env, fs,
     path::PathBuf,
+    process::{self, Command},
+    thread,
+    time::Duration,
 };
 
 const BLDIR: &str = "/sys/class/backlight";
@@ -31,7 +30,7 @@ const SAVEDIR: &str = "/.local/share/blight";
 /// Inc -> Increase, Dec -> Decrease.
 pub enum Direction {
     Inc,
-    Dec
+    Dec,
 }
 
 /// This enum is used to specify the kind of backlight change to carry out. \
@@ -59,7 +58,7 @@ impl Device {
             if PathBuf::from(format!("{BLDIR}/{n}/brightness")).is_file() {
                 n
             } else {
-                return None
+                return None;
             }
         } else {
             Self::detect_device(BLDIR)?
@@ -69,10 +68,11 @@ impl Device {
 
     async fn load(name: String) -> Device {
         let device_dir = format!("{BLDIR}/{name}");
-        Device { current: Self::get_current(&device_dir).await,
-                 max: Self::get_max(&device_dir).await,
-                 device_dir,
-                 name,
+        Device {
+            current: Self::get_current(&device_dir).await,
+            max: Self::get_max(&device_dir).await,
+            device_dir,
+            name,
         }
     }
 
@@ -83,22 +83,31 @@ impl Device {
         let mut fallback = String::new();
 
         for entry in dirs {
-            let  name = entry.unwrap().file_name();
+            let name = entry.unwrap().file_name();
             if let Some(name) = name.to_str() {
-                if !nv && name.contains("nvidia") { nv = true };
-                if !acpi && name.contains("acpi") { acpi = true };
+                if !nv && name.contains("nvidia") {
+                    nv = true
+                };
+                if !acpi && name.contains("acpi") {
+                    acpi = true
+                };
 
                 if name.contains("amdgpu") || name.contains("intel") {
-                    return Some(name.to_string())
+                    return Some(name.to_string());
                 }
                 fallback = name.to_string();
             }
-        };
+        }
 
-        if nv { Some(String::from("nvidia_0")) }
-        else if acpi { Some(String::from("acpi_video0")) }
-        else if !fallback.is_empty() { Some(fallback) }
-        else { return None }
+        if nv {
+            Some(String::from("nvidia_0"))
+        } else if acpi {
+            Some(String::from("acpi_video0"))
+        } else if !fallback.is_empty() {
+            Some(fallback)
+        } else {
+            return None;
+        }
     }
 
     async fn get_max(device_dir: &str) -> u16 {
@@ -121,16 +130,19 @@ impl Device {
     /// This method is used to write to the brightness file containted in /sys/class/backlight/ dir of the respective detected device.\
     /// It takes in a brightness value, and writes to othe relavant brightness file.
     pub fn write_value(&self, value: u16) {
-        if let Err(err) = fs::write(format!("{}/brightness",self.device_dir), format!("{value}")) {
-            let tip = format!("\
+        if let Err(err) = fs::write(
+            format!("{}/brightness", self.device_dir),
+            format!("{value}"),
+        ) {
+            let tip = format!(
+                "\
 Make sure you have write permissions for the file '{BLDIR}/{}/brightness'
 Visit https://wiki.archlinux.org/title/Backlight#Hardware_interfaces
-if you're unsure what to do.",self.name).green();
-            eprintln!(
-                "Error: {}\nTip: {}",
-                err.to_string().red(),
-                tip,
+if you're unsure what to do.",
+                self.name
             )
+            .green();
+            eprintln!("Error: {}\nTip: {}", err.to_string().red(), tip,)
         }
     }
 }
@@ -160,7 +172,10 @@ impl ErrorHandler for Option<Device> {
     type ReturnTarget = Device;
     fn err_handler(self) -> Self::ReturnTarget {
         self.unwrap_or_else(|| {
-            eprintln!("{}", "Error: No known device detected on system".red().bold());
+            eprintln!(
+                "{}",
+                "Error: No known device detected on system".red().bold()
+            );
             process::exit(1)
         })
     }
@@ -170,7 +185,10 @@ impl ErrorHandler for Result<u16, std::num::ParseIntError> {
     type ReturnTarget = u16;
     fn err_handler(self) -> Self::ReturnTarget {
         self.unwrap_or_else(|_| {
-            eprintln!("{}", "Invalid step size: use a positive integer".red().bold());
+            eprintln!(
+                "{}",
+                "Invalid step size: use a positive integer".red().bold()
+            );
             process::exit(1)
         })
     }
@@ -226,7 +244,9 @@ pub fn sweep(device: &Device, change: u16, dir: &Direction) {
             while val >= change {
                 device.write_value(val);
                 thread::sleep(Duration::from_millis(25));
-                if val == 0 { break }
+                if val == 0 {
+                    break;
+                }
                 val -= 1
             }
         }
@@ -238,21 +258,28 @@ pub fn save(device_name: Option<String>) {
 
     if !savedir.exists() {
         if fs::create_dir_all(&savedir).is_err() {
-                eprintln!("{} {}","Error: Failed to create save directory at:".red().bold(),
-                          savedir.display());
-                return;
+            eprintln!(
+                "{} {}",
+                "Error: Failed to create save directory at:".red().bold(),
+                savedir.display()
+            );
+            return;
         }
     }
 
     let device = Device::new(device_name).err_handler();
     savedir.push("blight.save");
 
-    if fs::write(&savedir, format!("{} {}",device.name, device.current)).is_err() {
-            eprintln!("{}\n{}","Error: Failed to write to save file at".red().bold(),savedir.display());
-            return;
+    if fs::write(&savedir, format!("{} {}", device.name, device.current)).is_err() {
+        eprintln!(
+            "{}\n{}",
+            "Error: Failed to write to save file at".red().bold(),
+            savedir.display()
+        );
+        return;
     };
 
-    println!("{}","Current brightness successfully saved".green())
+    println!("{}", "Current brightness successfully saved".green())
 }
 
 pub fn restore() {
@@ -263,27 +290,40 @@ pub fn restore() {
         match fs::read_to_string(save) {
             Ok(s) => restore = s,
             Err(err) => {
-                eprintln!("{}\n{}","Error: Failed to read from save file".red().bold(), err);
-                return
+                eprintln!(
+                    "{}\n{}",
+                    "Error: Failed to read from save file".red().bold(),
+                    err
+                );
+                return;
             }
         }
     } else {
-        eprintln!("{}\n{}","Error: No saved state found".red().bold(),
-                  "Tip: Try using `blight save` first".yellow());
+        eprintln!(
+            "{}\n{}",
+            "Error: No saved state found".red().bold(),
+            "Tip: Try using `blight save` first".yellow()
+        );
         return;
     }
 
     let (device_name, val) = restore.split_once(" ").unwrap();
     let device = Device::new(Some(device_name.to_string())).err_handler();
 
-    let value: u16 = if let Ok(v) = val.parse() {v} else {
-        eprintln!("{}\n{}","Error: Failed to parse saved brightness value.".red().bold(),
-                  "Tip: The saved state data might be corrupt. Try using `blight save` again.".yellow()
+    let value: u16 = if let Ok(v) = val.parse() {
+        v
+    } else {
+        eprintln!(
+            "{}\n{}",
+            "Error: Failed to parse saved brightness value."
+                .red()
+                .bold(),
+            "Tip: The saved state data might be corrupt. Try using `blight save` again.".yellow()
         );
-        return
+        return;
     };
     device.write_value(value);
-    println!("{}","Brightness successfully restored".green());
+    println!("{}", "Brightness successfully restored".green());
 }
 
 /// This function is the current way of determining whether another instance of blight is running.
@@ -337,12 +377,10 @@ pub fn print_status(device_name: Option<String>) {
 
 /// Reads backlight directory (sys/class/backlight) and prints it's contents
 pub fn print_devices() {
-    println!("{}","Detected Devices".bold());
+    println!("{}", "Detected Devices".bold());
     fs::read_dir(BLDIR)
         .expect("Failed to read Backlight Directory")
-        .for_each(|d| {
-            println!("{}", d.unwrap().file_name().to_string_lossy().green())
-        });
+        .for_each(|d| println!("{}", d.unwrap().file_name().to_string_lossy().green()));
 }
 
 /// This function prints helpful information about the CLI, such as available commands and examples.
@@ -385,30 +423,30 @@ mod tests {
     #[test]
     fn detecting_device_nvidia() {
         clean_up();
-        setup_test_env(&["nvidia_0","generic"]).unwrap();
+        setup_test_env(&["nvidia_0", "generic"]).unwrap();
         let name = Device::detect_device(TESTDIR);
         assert!(name.is_some());
-        assert_eq!(name.unwrap(),"nvidia_0");
+        assert_eq!(name.unwrap(), "nvidia_0");
         clean_up();
     }
 
     #[test]
     fn detecting_device_amd() {
         clean_up();
-        setup_test_env(&["nvidia_0","generic","amdgpu_x"]).unwrap();
+        setup_test_env(&["nvidia_0", "generic", "amdgpu_x"]).unwrap();
         let name = Device::detect_device(TESTDIR);
         assert!(name.is_some());
-        assert_eq!(name.unwrap(),"amdgpu_x");
+        assert_eq!(name.unwrap(), "amdgpu_x");
         clean_up();
     }
 
     #[test]
     fn detecting_device_acpi() {
         clean_up();
-        setup_test_env(&["acpi_video0","generic"]).unwrap();
+        setup_test_env(&["acpi_video0", "generic"]).unwrap();
         let name = Device::detect_device(TESTDIR);
         assert!(name.is_some());
-        assert_eq!(name.unwrap(),"acpi_video0");
+        assert_eq!(name.unwrap(), "acpi_video0");
         clean_up();
     }
 
@@ -418,20 +456,25 @@ mod tests {
         setup_test_env(&["generic"]).unwrap();
         let name = Device::detect_device(TESTDIR);
         assert!(name.is_some());
-        assert_eq!(name.unwrap(),"generic");
+        assert_eq!(name.unwrap(), "generic");
         clean_up();
     }
-
 
     #[test]
     fn writing_value() {
         clean_up();
         setup_test_env(&["generic"]).unwrap();
-        let d = Device { name: "generic".to_string(), max:100, current: 50, device_dir: format!("{TESTDIR}/generic") };
+        let d = Device {
+            name: "generic".to_string(),
+            max: 100,
+            current: 50,
+            device_dir: format!("{TESTDIR}/generic"),
+        };
         d.write_value(100);
-        let r = fs::read_to_string(format!("{TESTDIR}/generic/brightness")).expect("failed to read test backlight value");
+        let r = fs::read_to_string(format!("{TESTDIR}/generic/brightness"))
+            .expect("failed to read test backlight value");
         let res = r.trim();
-        assert_eq!("100",res,"Result was {res}");
+        assert_eq!("100", res, "Result was {res}");
         clean_up();
     }
 
@@ -440,7 +483,7 @@ mod tests {
         clean_up();
         setup_test_env(&["generic"]).unwrap();
         let current = block_on(Device::get_current(&format!("{TESTDIR}/generic")));
-        assert_eq!(current.to_string(),"50");
+        assert_eq!(current.to_string(), "50");
         clean_up();
     }
 
@@ -477,12 +520,13 @@ mod tests {
                 let mut p = f.metadata().unwrap().permissions();
                 p.set_readonly(true);
                 f.set_permissions(p)
-            }).unwrap();
+            })
+            .unwrap();
         assert!(check_write_perm("generic", TESTDIR).is_err());
         clean_up();
     }
 
-    fn setup_test_env(dirs: &[&str]) -> Result<(),Box<dyn Error>> {
+    fn setup_test_env(dirs: &[&str]) -> Result<(), Box<dyn Error>> {
         fs::create_dir(TESTDIR)?;
         for dir in dirs {
             fs::create_dir(format!("{TESTDIR}/{dir}"))?;
@@ -493,7 +537,10 @@ mod tests {
     }
 
     fn clean_up() {
-        if fs::read_dir(".").unwrap().any(|dir| {dir.unwrap().file_name().as_os_str() == "testbldir"}) {
+        if fs::read_dir(".")
+            .unwrap()
+            .any(|dir| dir.unwrap().file_name().as_os_str() == "testbldir")
+        {
             fs::remove_dir_all(TESTDIR).expect("Failed to clean up testing backlight directory.")
         }
     }
