@@ -263,7 +263,7 @@ pub fn restore() {
         match fs::read_to_string(save) {
             Ok(s) => restore = s,
             Err(err) => {
-                eprintln!("{} ({})","Error: Failed to read from save file", err);
+                eprintln!("{}\n{}","Error: Failed to read from save file".red().bold(), err);
                 return
             }
         }
