@@ -237,20 +237,20 @@ pub fn save(device_name: Option<String>) {
     let mut savedir = PathBuf::from(env::var("HOME").unwrap() + SAVEDIR);
 
     if !savedir.exists() {
-        fs::create_dir_all(&savedir)
-            .unwrap_or_else(|_| {
-                eprintln!("{} {}","Error: Failed to create save directory at".red().bold(),savedir.display())
-            })
+        if fs::create_dir_all(&savedir).is_err() {
+                eprintln!("{} {}","Error: Failed to create save directory at:".red().bold(),
+                          savedir.display());
+                return;
+        }
     }
 
     let device = Device::new(device_name).err_handler();
     savedir.push("blight.save");
 
-    fs::write(&savedir, format!("{} {}",device.name, device.current))
-        .unwrap_or_else(|_| {
-            eprintln!("{} {}","Error: Failed to write to save file at".red().bold(),savedir.display());
-            return
-    });
+    if fs::write(&savedir, format!("{} {}",device.name, device.current)).is_err() {
+            eprintln!("{}\n{}","Error: Failed to write to save file at".red().bold(),savedir.display());
+            return;
+    };
 
     println!("{}","Current brightness successfully saved".green())
 }
