@@ -283,7 +283,7 @@ pub fn print_status() {
 
 /// Reads backlight directory (sys/class/backlight) and prints it's contents
 pub fn print_devices() {
-    println!("{}","Detected Devices:".bold());
+    println!("{}","Detected Devices".bold());
     fs::read_dir(BLDIR)
         .expect("Failed to read Backlight Directory")
         .for_each(|d| {
