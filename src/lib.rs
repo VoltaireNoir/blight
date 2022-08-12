@@ -419,6 +419,22 @@ Examples:
     );
 }
 
+pub fn print_welcome() {
+    println!("{}\n","blight: a backlight utility for Linux".blue().bold());
+    let cc = "\
+Common commands:
+inc -> increase brightness by 2%
+dec -> decrease brightness by 2%
+set -> set custom brightness value
+sweep-up -> increase brightness smoothly by 10%
+sweep-down -> decrease brightness smoothly by 10%
+status -> show backlight device info
+save, restore -> save and restore brightness
+";
+    println!("{}",cc.green().bold());
+    println!("{}","Use `blight help' to display all commands and options".yellow())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

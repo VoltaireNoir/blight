@@ -57,6 +57,6 @@ fn argument_parser(mut args: Args) {
             )
         }
     } else {
-        blight::print_help();
+        blight::print_welcome();
     }
 }
