@@ -2,6 +2,7 @@ use blight::{
     Change::{Regular,Sweep},
     Direction::{Dec,Inc},
 };
+use colored::Colorize;
 use std::env::{self,Args};
 
 fn main() {
@@ -14,6 +15,7 @@ fn main() {
 fn argument_parser(mut args: Args) {
     if let Some(arg) = args.next().and_then(|_| args.next()) {
         match &arg[..] {
+            "help" => blight::print_help(),
             "status" => blight::print_status(args.next()),
             "list" => blight::print_devices(),
             "save" => blight::save(args.next()),
@@ -49,7 +51,10 @@ fn argument_parser(mut args: Args) {
                     blight::change_bl("10", Sweep, Dec, args.next())
                 }
             },
-            _ => blight::print_help(),
+            _ => println!("{}\n{}",
+                          "Oops... You appear to have entered an unrecognised command ┐(´•_•`)┌".bold(),
+                          "Tip: Try `blight help` to see all supported commands".yellow(),
+            )
         }
     } else {
         blight::print_help();
