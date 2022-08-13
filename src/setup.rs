@@ -1,5 +1,6 @@
 use colored::*;
 use std::{
+    error::Error,
     io::ErrorKind,
     path::PathBuf,
     process,
@@ -29,7 +30,7 @@ pub fn run() {
     print!("Video Group: ");
     match setup_group() {
         GroupResult::Exists => println!("{}","Ok (already in group)".green()),
-        GroupResult::Err => println!("{}","Failed to add user to video group".red()),
+        GroupResult::Err(err) => println!("{} {}","Error:".red(),err),
         GroupResult::Ok => println!("{}","Ok".green())
     }
 }
@@ -54,7 +55,7 @@ fn setup_rules() -> RulesResult {
 enum GroupResult {
     Ok,
     Exists,
-    Err,
+    Err(Box<dyn Error>),
 }
 
 fn setup_group() -> GroupResult {
@@ -65,14 +66,39 @@ fn setup_group() -> GroupResult {
             .stdout)
         .unwrap();
 
-    String::from_utf8(
+    if String::from_utf8(
         process::Command::new("groups")
             .arg(user.trim())
             .output()
             .unwrap()
             .stdout)
         .unwrap()
-        .contains("video")
-        .then_some(GroupResult::Exists)
-        .unwrap_or(GroupResult::Err)
+        .contains("video") {
+            return GroupResult::Exists
+        }
+
+    if fs::read_to_string("/etc/group")
+        .unwrap()
+        .contains("video") {
+            if let Err(err) = process::Command::new("usermod")
+                .args(["-a","-G",user.trim()])
+                .spawn() {
+                    GroupResult::Err(Box::new(err))
+                }
+            else {
+                GroupResult::Ok
+            }
+        } else {
+            if let Err(err) = process::Command::new("groupadd")
+                .arg("video")
+                .spawn() {
+                    return GroupResult::Err(Box::new(err))
+                }
+            if let Err(err) = process::Command::new("usermod")
+                .args(["-a","-G",&user])
+                .spawn() {
+                    return GroupResult::Err(Box::new(err))
+                }
+            GroupResult::Ok
+        }
 }
