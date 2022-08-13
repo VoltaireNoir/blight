@@ -1,6 +1,7 @@
 use blight::{
     Change::{Regular,Sweep},
     Direction::{Dec,Inc},
+    setup,
 };
 use colored::Colorize;
 use std::env::{self,Args};
@@ -20,6 +21,7 @@ fn argument_parser(mut args: Args) {
             "list" => blight::print_devices(),
             "save" => blight::save(args.next()),
             "restore" => blight::restore(),
+            "setup" => setup::run(),
             "set" => {
                 if let Some(v) = args.next() { blight::set_bl(&v, args.next()) }
             },
