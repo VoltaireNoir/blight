@@ -431,7 +431,7 @@ sweep-down -> decrease brightness smoothly by 10%
 status -> show backlight device info
 save, restore -> save and restore brightness
 ";
-    println!("{}",cc.green().bold());
+    println!("{}\n{}","Common Commands".bold(), cc.green().bold());
     println!("{}","Use `blight help' to display all commands and options".yellow())
 }
 
