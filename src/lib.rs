@@ -423,7 +423,8 @@ Examples:
 }
 
 pub fn print_welcome() {
-    println!("{}\n","blight: a backlight utility for Linux".blue().bold());
+    let banner = include_str!("banner");
+    println!("{}\n {}\n",banner.blue(),"A backlight utility for Linux".blue().bold());
     let cc = "\
 inc -> increase brightness by 2%
 dec -> decrease brightness by 2%
