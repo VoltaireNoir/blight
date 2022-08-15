@@ -81,7 +81,7 @@ fn setup_group() -> GroupResult {
             if let Err(err) = process::Command::new("groupadd")
                 .arg("video")
                 .stderr(process::Stdio::null())
-                .spawn() {
+                .output() {
                     return GroupResult::Err(Box::new(err))
                 }
             if let Err(err) = add_to_group(&user) {
@@ -109,6 +109,6 @@ fn add_to_group(user: &str) -> Result<(), io::Error> {
     process::Command::new("usermod")
         .args(["-aG","video",user.trim()])
         .stderr(process::Stdio::null())
-        .spawn()?;
+        .output()?;
     Ok(())
 }
