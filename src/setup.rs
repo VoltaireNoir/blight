@@ -1,12 +1,11 @@
 use colored::*;
 use std::{
     error::Error,
-    io::ErrorKind,
+    io::{self, ErrorKind},
     path::PathBuf,
     process,
     fs,
 };
-
 
 const RULES: &str = r#"ACTION=="add", SUBSYSTEM=="backlight", RUN+="/bin/chgrp video /sys/class/backlight/%k/brightness"
 ACTION=="add", SUBSYSTEM=="backlight", RUN+="/bin/chmod g+w /sys/class/backlight/%k/brightness""#;
@@ -21,7 +20,7 @@ pub fn run() {
         RulesResult::Err(err) => {
             if err.kind() == ErrorKind::PermissionDenied {
                 println!("{}",
-                         "Permission denied. Run `blight setup` with sudo.".red())
+                         "Failed. Run `blight setup` with sudo.".red())
             } else {
                 println!("{} {}","Error:".red(),err);
             }
@@ -31,6 +30,7 @@ pub fn run() {
     match setup_group() {
         GroupResult::Exists => println!("{}","Ok (already in group)".green()),
         GroupResult::Err(err) => println!("{} {}","Error:".red(),err),
+        GroupResult::UnknownErr => println!("{}", "Failed. Run `blight setup` using sudo.".red(),),
         GroupResult::Ok => println!("{}","Ok".green())
     }
 }
@@ -56,6 +56,7 @@ enum GroupResult {
     Ok,
     Exists,
     Err(Box<dyn Error>),
+    UnknownErr,
 }
 
 fn setup_group() -> GroupResult {
@@ -66,39 +67,48 @@ fn setup_group() -> GroupResult {
             .stdout)
         .unwrap();
 
-    if String::from_utf8(
-        process::Command::new("groups")
-            .arg(user.trim())
-            .output()
-            .unwrap()
-            .stdout)
-        .unwrap()
-        .contains("video") {
-            return GroupResult::Exists
-        }
+    if in_group(&user) {
+        return GroupResult::Exists
+    }
 
     if fs::read_to_string("/etc/group")
         .unwrap()
         .contains("video") {
-            if let Err(err) = process::Command::new("usermod")
-                .args(["-a","-G",user.trim()])
-                .spawn() {
-                    GroupResult::Err(Box::new(err))
+            if let Err(err) = add_to_group(&user) {
+                    return GroupResult::Err(Box::new(err))
                 }
-            else {
-                GroupResult::Ok
-            }
         } else {
             if let Err(err) = process::Command::new("groupadd")
                 .arg("video")
+                .stderr(process::Stdio::null())
                 .spawn() {
                     return GroupResult::Err(Box::new(err))
                 }
-            if let Err(err) = process::Command::new("usermod")
-                .args(["-a","-G",&user])
-                .spawn() {
+            if let Err(err) = add_to_group(&user) {
                     return GroupResult::Err(Box::new(err))
                 }
-            GroupResult::Ok
         }
+
+    in_group(&user)
+        .then_some(GroupResult::Ok)
+        .unwrap_or(GroupResult::UnknownErr)
+}
+
+fn in_group(user: &str) -> bool {
+    String::from_utf8(
+        process::Command::new("groups")
+            .arg(user.trim())
+            .output()
+            .expect("Failed to run groups command")
+            .stdout)
+        .unwrap()
+        .contains("video")
+}
+
+fn add_to_group(user: &str) -> Result<(), io::Error> {
+    process::Command::new("usermod")
+        .args(["-aG","video",user.trim()])
+        .stderr(process::Stdio::null())
+        .spawn()?;
+    Ok(())
 }
