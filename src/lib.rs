@@ -138,7 +138,8 @@ impl Device {
         ) {
             let tip = format!(
                 "\
-Make sure you have write permissions for the file '{BLDIR}/{}/brightness'
+Make sure you have write permissions for the file
+'{BLDIR}/{}/brightness'
 Visit https://wiki.archlinux.org/title/Backlight#Hardware_interfaces
 if you're unsure what to do.",
                 self.name
