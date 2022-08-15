@@ -394,21 +394,28 @@ pub fn print_devices() {
 
 /// This function prints helpful information about the CLI, such as available commands and examples.
 pub fn print_help() {
-    let title = "blight: A backlight utility that plays well with hybrid GPUs";
+    let title = "blight: A backlight utility for Linux that plays well with hybrid GPUs";
     let quote = "\"And man said, \'let there b-light\' and there was light.\" - Some Book 1:3";
     let commands = "\
-opt -> Optional, val -> Value, dev -> Device name
+opt: Optional, val: Value, dev: Device name
 
-blight inc [opt val] [opt dev] -> increase by 2%
-blight dec [opt val] [opt dev] -> decrease by 2%
-blight set [val] [opt dev] -> set custom brightness value
-blight sweep-up [opt val] [opt dev] -> smoothly increase by 10%
-blight sweep-down [opt val] [opt dev] -> smoothly decrease by 10%
-blight status [opt dev] -> backlight device status
-blight list -> list all backlight devices";
+inc [opt val] [opt dev] -> increase by 2%
+dec [opt val] [opt dev] -> decrease by 2%
+set [val] [opt dev] -> set custom brightness value
+sweep-up [opt val] [opt dev] -> smoothly increase by 10%
+sweep-down [opt val] [opt dev] -> smoothly decrease by 10%
+save [opt dev] -> save current brightness value to restore later
+restore [opt dev] -> restore saved brightness value
+
+setup -> installs udev rules and adds user to video group (run with sudo)
+status [opt dev] -> backlight device status
+list -> list all backlight devices
+help -> displays help";
 
     let exampels = "\
 Examples:
+    sudo blight setup
+    blight status intel_backlight
     blight inc (increases brightness by 2% - default step size)
     blight dec 10 (increases brightness by 10%)
     blight sweep-up 15 (smoothly increases brightness by 15%)
@@ -424,8 +431,7 @@ Examples:
 }
 
 pub fn print_welcome() {
-    let banner = include_str!("banner");
-    println!("{}\n {}\n",banner.blue(),"A backlight utility for Linux".blue().bold());
+    println!("{}\n","blight: A backlight utility for Linux".blue().bold());
     let cc = "\
 inc -> increase brightness by 2%
 dec -> decrease brightness by 2%
@@ -433,7 +439,7 @@ set -> set custom brightness value
 sweep-up -> increase brightness smoothly by 10%
 sweep-down -> decrease brightness smoothly by 10%
 status -> show backlight device info
-save, restore -> save and restore brightness
+setup -> gain write permission to brightness file
 ";
     println!("{}\n{}","Common Commands".bold(), cc.green().bold());
     println!("{}","Use `blight help' to display all commands and options".yellow())

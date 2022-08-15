@@ -54,7 +54,7 @@ fn argument_parser(mut args: Args) {
                 }
             },
             _ => println!("{}\n{}",
-                          "Oops... You appear to have entered an unrecognised command ┐(´•_•`)┌".bold(),
+                          "Oops... You have entered an unrecognised command".bold(),
                           "Tip: Try `blight help` to see all supported commands".yellow(),
             )
         }

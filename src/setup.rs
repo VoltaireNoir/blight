@@ -30,9 +30,13 @@ pub fn run() {
     match setup_group() {
         GroupResult::Exists => println!("{}","Ok (already in group)".green()),
         GroupResult::Err(err) => println!("{} {}","Error:".red(),err),
-        GroupResult::UnknownErr => println!("{}", "Failed. Run `blight setup` using sudo.".red(),),
+        GroupResult::UnknownErr => println!("{}", "Failed. Run `blight setup` with sudo.".red(),),
         GroupResult::Ok => println!("{}","Ok".green())
     }
+
+    println!("{}\n{}",
+             "Recommended: Reboot your system once the setup completes successfully.".yellow(),
+             "You can run `blight status` to check if you have gained write permissions.".yellow());
 }
 
 enum RulesResult {
