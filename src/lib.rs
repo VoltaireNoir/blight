@@ -140,8 +140,9 @@ impl Device {
                 "\
 Make sure you have write permissions for the file
 '{BLDIR}/{}/brightness'
-Visit https://wiki.archlinux.org/title/Backlight#Hardware_interfaces
-if you're unsure what to do.",
+Run `sudo blight setup` to install necessarry udev rules and add user to video group.
+Or visit https://wiki.archlinux.org/title/Backlight#Hardware_interfaces
+if you'd like to do it manually.",
                 self.name
             )
             .yellow();
