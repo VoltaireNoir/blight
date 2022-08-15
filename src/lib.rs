@@ -222,8 +222,13 @@ pub fn change_bl(step_size: &str, ch: Change, dir: Direction, device_name: Optio
 /// This function takes a brightness value, creates a Device struct, and writes the value to the brightness file
 /// as long as the given value falls under the min and max bounds.
 /// Unlike change_bl, this function does not calculate any change, it writes the given value directly.
-pub fn set_bl(val: &str, device_name: Option<String>) {
-    let val: u16 = val.parse().err_handler();
+pub fn set_bl(val: Option<String>, device_name: Option<String>) {
+    let val: u16 = if let Some(val) = val {
+        val.parse().err_handler()
+    } else {
+        eprintln!("{}","Error: Missing argument. No value provided to set.".red().bold());
+        return ;
+    };
 
     let device = Device::new(device_name).err_handler();
 

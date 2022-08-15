@@ -22,9 +22,7 @@ fn argument_parser(mut args: Args) {
             "save" => blight::save(args.next()),
             "restore" => blight::restore(),
             "setup" => setup::run(),
-            "set" => {
-                if let Some(v) = args.next() { blight::set_bl(&v, args.next()) }
-            },
+            "set" => blight::set_bl(args.next(), args.next()),
             "inc" => {
                 if let Some(v) = args.next() {
                     blight::change_bl(&v, Regular, Inc, args.next())
