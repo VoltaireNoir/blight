@@ -79,35 +79,30 @@ impl Device {
 
     fn detect_device(bldir: &str) -> Option<String> {
         let dirs = fs::read_dir(bldir).expect("Failed to read dir");
-        let mut nv: bool = false;
-        let mut acpi: bool = false;
-        let mut fallback = String::new();
+        let (mut nv, mut ac, mut fl): (Option<String>, Option<String>, Option<String>) = (None, None, None);
 
         for entry in dirs {
             let name = entry.unwrap().file_name();
             if let Some(name) = name.to_str() {
-                if !nv && name.contains("nvidia") {
-                    nv = true
-                };
-                if !acpi && name.contains("acpi") {
-                    acpi = true
-                };
 
                 if name.contains("amdgpu") || name.contains("intel") {
                     return Some(name.to_string());
+                } else if nv.is_none() && (name.contains("nvidia") | name.contains("nv")) {
+                    nv = Some(name.to_string());
+                } else if ac.is_none() && name.contains("acpi") {
+                    ac = Some(name.to_string());
+                } else {
+                    fl = Some(name.to_string());
                 }
-                fallback = name.to_string();
             }
         }
 
-        if nv {
-            Some(String::from("nvidia_0"))
-        } else if acpi {
-            Some(String::from("acpi_video0"))
-        } else if !fallback.is_empty() {
-            Some(fallback)
+        if nv.is_some() {
+            nv
+        } else if ac.is_some() {
+            ac
         } else {
-            return None;
+            fl
         }
     }
 
