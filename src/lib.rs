@@ -14,7 +14,6 @@
 //! Run `blight` in terminal to display all supported commands and options
 
 use colored::*;
-use futures::executor::block_on;
 use std::{
     env, fs,
     path::PathBuf,
@@ -65,14 +64,14 @@ impl Device {
         } else {
             Self::detect_device(BLDIR)?
         };
-        Some(block_on(Self::load(name)))
+        Some(Self::load(name))
     }
 
-    async fn load(name: String) -> Device {
+    fn load(name: String) -> Device {
         let device_dir = format!("{BLDIR}/{name}");
         Device {
-            current: Self::get_current(&device_dir).await,
-            max: Self::get_max(&device_dir).await,
+            current: Self::get_current(&device_dir),
+            max: Self::get_max(&device_dir),
             device_dir,
             name,
         }
@@ -112,7 +111,7 @@ impl Device {
         }
     }
 
-    async fn get_max(device_dir: &str) -> u16 {
+    fn get_max(device_dir: &str) -> u16 {
         let max: u16 = fs::read_to_string(format!("{device_dir}/max_brightness"))
             .expect("Failed to read max value")
             .trim()
@@ -121,7 +120,7 @@ impl Device {
         max
     }
 
-    async fn get_current(device_dir: &str) -> u16 {
+    fn get_current(device_dir: &str) -> u16 {
         let current: u16 = fs::read_to_string(format!("{device_dir}/brightness"))
             .expect("Failed to read max value")
             .trim()
@@ -519,7 +518,7 @@ mod tests {
     fn current_value() {
         clean_up();
         setup_test_env(&["generic"]).unwrap();
-        let current = block_on(Device::get_current(&format!("{TESTDIR}/generic")));
+        let current = Device::get_current(&format!("{TESTDIR}/generic"));
         assert_eq!(current.to_string(), "50");
         clean_up();
     }
