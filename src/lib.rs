@@ -45,9 +45,9 @@ pub enum Change {
 /// Contains name of the detected GPU device and its current and max brightness values.
 #[derive(Debug)]
 pub struct Device {
-    pub name: String,
-    pub current: u16,
-    pub max: u16,
+    name: String,
+    current: u16,
+    max: u16,
     device_dir: String,
 }
 
