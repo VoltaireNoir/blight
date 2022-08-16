@@ -262,6 +262,7 @@ pub fn sweep(device: &Device, change: u16, dir: &Direction) {
 }
 
 pub fn save(device_name: Option<String>) {
+    let device = Device::new(device_name).err_handler();
     let mut savedir = PathBuf::from(env::var("HOME").unwrap() + SAVEDIR);
 
     if !savedir.exists() {
@@ -275,7 +276,6 @@ pub fn save(device_name: Option<String>) {
         }
     }
 
-    let device = Device::new(device_name).err_handler();
     savedir.push("blight.save");
 
     if fs::write(&savedir, format!("{} {}", device.name, device.current)).is_err() {
