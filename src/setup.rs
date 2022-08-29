@@ -1,3 +1,8 @@
+//! This module helps set up necessary udev rules for blight or the current user to gain write permission
+//! to the brightness file in /sys/class/backlight/<device>/brightness \n
+//! The write permission and ownership of the brightness file is assigned to the video group through the udev rules.
+//! The user is then added to the video group if they're not in the group already.
+
 use colored::*;
 use std::{
     error::Error,
@@ -11,6 +16,8 @@ const RULES: &str = r#"ACTION=="add", SUBSYSTEM=="backlight", RUN+="/bin/chgrp v
 ACTION=="add", SUBSYSTEM=="backlight", RUN+="/bin/chmod g+w /sys/class/backlight/%k/brightness""#;
 const UDEVFILE: &str = "/lib/udev/rules.d/90-blight.rules";
 
+/// The function runs the setup. The udev file 90-blight.rules is placed in /lib/udev/.udev.rules.d/.
+/// The user is added to the 'video' group if they're not already in it.
 pub fn run() {
     println!("{}","Running Setup".bold());
     print!("UDEV Rules: ");

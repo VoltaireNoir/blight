@@ -261,6 +261,7 @@ pub fn sweep(device: &Device, change: u16, dir: &Direction) {
     }
 }
 
+/// Saves current brightness value to "$HOME/.local/share/blight/save"
 pub fn save(device_name: Option<String>) {
     let device = Device::new(device_name).err_handler();
     let mut savedir = PathBuf::from(env::var("HOME").unwrap() + SAVEDIR);
@@ -290,6 +291,7 @@ pub fn save(device_name: Option<String>) {
     println!("{}", "Current brightness successfully saved".green())
 }
 
+/// Restores brightness value from "$HOME/.local/share/blight/save" if it exists.
 pub fn restore() {
     let save = PathBuf::from((env::var("HOME").unwrap() + SAVEDIR) + "/blight.save");
     let restore;
@@ -422,9 +424,10 @@ Examples:
     blight inc 2 nvidia_0 (increases nvidia_0's brightness by 2%)";
 
     println!(
-        "{}\n\n{}\n\n{}\n\n{}",
+        "{}\n\n{}\n\n{}\n{}\n\n{}",
         title.blue().bold(),
         quote,
+        "Commands".bold(),
         commands.green().bold(),
         exampels.bright_yellow()
     );
