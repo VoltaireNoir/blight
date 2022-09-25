@@ -344,8 +344,6 @@ pub fn is_running() -> bool {
                 .unwrap()
                 .file_name()
                 .unwrap()
-                .to_str()
-                .unwrap(),
         )
         .output()
         .expect("Process command failed");
