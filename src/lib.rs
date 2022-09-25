@@ -56,11 +56,9 @@ impl Device {
     /// This is how the devices are priorirized AmdGPU or Intel > Nvdia > ACPI > Any Fallback Device
     pub fn new(name: Option<String>) -> Option<Device> {
         let name = if let Some(n) = name {
-            if PathBuf::from(format!("{BLDIR}/{n}/brightness")).is_file() {
-                n
-            } else {
-                return None;
-            }
+            PathBuf::from(format!("{BLDIR}/{n}/brightness"))
+                .is_file()
+                .then_some(n)?
         } else {
             Self::detect_device(BLDIR)?
         };
