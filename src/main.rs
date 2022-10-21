@@ -8,6 +8,8 @@ use std::env::{self,Args};
 
 fn main() {
     if blight::is_running() {
+        eprintln!("{} Another instance of blight is already running.",
+                  "Error:".red().bold());
         return;
     }
     argument_parser(env::args());
