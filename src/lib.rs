@@ -14,13 +14,12 @@
 //! Run `blight` in terminal to display all supported commands and options
 
 use err::BlibError;
-use std::{env, fs, path::PathBuf, thread, time::Duration};
+use std::{fs, path::PathBuf, thread, time::Duration};
 
 pub mod err;
 pub mod setup;
 
 pub const BLDIR: &str = "/sys/class/backlight";
-const SAVEDIR: &str = "/.local/share/blight";
 
 type BlResult<T> = Result<T, BlibError>;
 
@@ -219,42 +218,6 @@ pub fn sweep(device: &Device, change: u16, dir: &Direction) -> Result<(), BlibEr
             }
         }
     }
-    Ok(())
-}
-
-/// Saves current brightness value to "$HOME/.local/share/blight/save"
-pub fn save(device_name: Option<String>) -> Result<(), BlibError> {
-    let device = Device::new(device_name)?;
-    let mut savedir = PathBuf::from(env::var("HOME").unwrap() + SAVEDIR);
-
-    if !savedir.exists() && fs::create_dir_all(&savedir).is_err() {
-        return Err(BlibError::CreateSaveDir(savedir));
-    }
-
-    savedir.push("blight.save");
-
-    if fs::write(&savedir, format!("{} {}", device.name, device.current)).is_err() {
-        return Err(BlibError::WriteToSaveFile(savedir));
-    };
-
-    Ok(())
-}
-
-/// Restores brightness value from "$HOME/.local/share/blight/save" if it exists.
-pub fn restore() -> Result<(), BlibError> {
-    let save = PathBuf::from((env::var("HOME").unwrap() + SAVEDIR) + "/blight.save");
-
-    let restore = if save.is_file() {
-        fs::read_to_string(save).map_err(BlibError::ReadFromSave)?
-    } else {
-        return Err(BlibError::NoSaveFound);
-    };
-
-    let (device_name, val) = restore.split_once(' ').unwrap();
-    let device = Device::new(Some(device_name.to_string()))?;
-
-    let value: u16 = val.parse().or(Err(BlibError::SaveParseErr))?;
-    device.write_value(value)?;
     Ok(())
 }
 

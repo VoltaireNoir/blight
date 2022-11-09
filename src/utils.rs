@@ -5,7 +5,9 @@ use blight::{
     BLDIR,
 };
 use colored::Colorize;
-use std::{env, env::Args, fs, iter::Skip, process};
+use std::{env, env::Args, fs, iter::Skip, path::PathBuf, process};
+
+const SAVEDIR: &str = "/.local/share/blight";
 
 pub struct Config {
     command: Command,
@@ -107,8 +109,8 @@ pub fn execute(conf: Config) -> Result<SuccessMessage, blight::err::BlibError> {
         List => print_devices(),
         Setup => blight::setup::run(),
         Status => print_status(conf.options.device)?,
-        Save => blight::save(conf.options.device)?,
-        Restore => blight::restore()?,
+        Save => save(conf.options.device)?,
+        Restore => restore()?,
         Set(v) => blight::set_bl(v, conf.options.device)?,
         Adjust { dir, value } => {
             blight::change_bl(value, conf.options.sweep, dir, conf.options.device)?
@@ -275,4 +277,40 @@ pub fn print_shelp() {
         ct = "Common Commands".bold(),
         h = "Use `blight help' to display all commands and options".yellow()
     );
+}
+
+/// Saves current brightness value to "$HOME/.local/share/blight/save"
+pub fn save(device_name: Option<String>) -> Result<(), BlibError> {
+    let device = Device::new(device_name)?;
+    let mut savedir = PathBuf::from(env::var("HOME").unwrap() + SAVEDIR);
+
+    if !savedir.exists() && fs::create_dir_all(&savedir).is_err() {
+        return Err(BlibError::CreateSaveDir(savedir));
+    }
+
+    savedir.push("blight.save");
+
+    if fs::write(&savedir, format!("{} {}", device.name, device.current)).is_err() {
+        return Err(BlibError::WriteToSaveFile(savedir));
+    };
+
+    Ok(())
+}
+
+/// Restores brightness value from "$HOME/.local/share/blight/save" if it exists.
+pub fn restore() -> Result<(), BlibError> {
+    let save = PathBuf::from((env::var("HOME").unwrap() + SAVEDIR) + "/blight.save");
+
+    let restore = if save.is_file() {
+        fs::read_to_string(save).map_err(BlibError::ReadFromSave)?
+    } else {
+        return Err(BlibError::NoSaveFound);
+    };
+
+    let (device_name, val) = restore.split_once(' ').unwrap();
+    let device = Device::new(Some(device_name.to_string()))?;
+
+    let value: u16 = val.parse().or(Err(BlibError::SaveParseErr))?;
+    device.write_value(value)?;
+    Ok(())
 }
