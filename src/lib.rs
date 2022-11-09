@@ -17,7 +17,6 @@ use err::BlibError;
 use std::{fs, path::PathBuf, thread, time::Duration};
 
 pub mod err;
-pub mod setup;
 
 pub const BLDIR: &str = "/sys/class/backlight";
 

@@ -7,6 +7,8 @@ use blight::{
 use colored::Colorize;
 use std::{env, env::Args, fs, iter::Skip, path::PathBuf, process};
 
+mod setup;
+
 const SAVEDIR: &str = "/.local/share/blight";
 
 pub struct Config {
@@ -107,7 +109,7 @@ pub fn execute(conf: Config) -> Result<SuccessMessage, blight::err::BlibError> {
         Help => print_help(),
         ShortHelp => print_shelp(),
         List => print_devices(),
-        Setup => blight::setup::run(),
+        Setup => setup::run(),
         Status => print_status(conf.options.device)?,
         Save => save(conf.options.device)?,
         Restore => restore()?,
