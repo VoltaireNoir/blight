@@ -3,7 +3,7 @@ use std::env;
 mod utils;
 
 fn main() {
-    if blight::is_running() {
+    if utils::is_running() {
         utils::print_err("Another instance of blight is already running");
         return;
     }
