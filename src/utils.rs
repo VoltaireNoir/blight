@@ -169,8 +169,6 @@ fn gen_success_msg(cm: &Command) -> SuccessMessage {
     }
 }
 
-/// This function is the current way of determining whether another instance of blight is running.
-/// This method depends on pgrep but this may be replaced with a better implementation in the future.
 pub fn is_running() -> bool {
     let out = process::Command::new("pgrep")
         .arg("-x")
@@ -188,7 +186,6 @@ fn check_write_perm(device_name: &str, bldir: &str) -> Result<(), std::io::Error
         .and(Ok(()))
 }
 
-/// This function creates a Device instance and prints the detected device, along with its current and max brightness values.
 pub fn print_status(device_name: Option<String>) -> Result<(), BlibError> {
     let device = Device::new(device_name)?;
 
@@ -208,7 +205,6 @@ pub fn print_status(device_name: Option<String>) -> Result<(), BlibError> {
     Ok(())
 }
 
-/// Reads backlight directory (sys/class/backlight) and prints it's contents
 pub fn print_devices() {
     println!("{}", "Detected Devices".bold());
     fs::read_dir(BLDIR)
@@ -216,7 +212,6 @@ pub fn print_devices() {
         .for_each(|d| println!("{}", d.unwrap().file_name().to_string_lossy().green()));
 }
 
-/// This function prints helpful information about the CLI, such as available commands and examples.
 pub fn print_help() {
     let title = "blight: A backlight utility for Linux that plays well with hybrid GPUs";
     let quote = "\"And man said, \'let there b-light\' and there was light.\" - Some Book 1:3";
@@ -281,7 +276,6 @@ pub fn print_shelp() {
     );
 }
 
-/// Saves current brightness value to "$HOME/.local/share/blight/save"
 pub fn save(device_name: Option<String>) -> Result<(), BlibError> {
     let device = Device::new(device_name)?;
     let mut savedir = PathBuf::from(env::var("HOME").unwrap() + SAVEDIR);
@@ -299,7 +293,6 @@ pub fn save(device_name: Option<String>) -> Result<(), BlibError> {
     Ok(())
 }
 
-/// Restores brightness value from "$HOME/.local/share/blight/save" if it exists.
 pub fn restore() -> Result<(), BlibError> {
     let save = PathBuf::from((env::var("HOME").unwrap() + SAVEDIR) + "/blight.save");
 
