@@ -189,7 +189,7 @@ fn check_write_perm(device_name: &str, bldir: &str) -> Result<(), std::io::Error
 pub fn print_status(device_name: Option<String>) -> Result<(), BlibError> {
     let device = Device::new(device_name)?;
 
-    let write_perm = match check_write_perm(&device.name, BLDIR) {
+    let write_perm = match check_write_perm(device.name(), BLDIR) {
         Ok(_) => "Ok".green(),
         Err(err) => format!("{err}").red(),
     };
@@ -197,10 +197,10 @@ pub fn print_status(device_name: Option<String>) -> Result<(), BlibError> {
     println!(
         "{}\nDetected device: {}\nWrite permission: {}\nCurrent brightness: {}\nMax brightness {}",
         "Device status".bold(),
-        device.name.green(),
+        device.name().green(),
         write_perm,
-        device.current.to_string().green(),
-        device.max.to_string().green()
+        device.current().to_string().green(),
+        device.max().to_string().green()
     );
     Ok(())
 }
@@ -286,7 +286,7 @@ pub fn save(device_name: Option<String>) -> Result<(), BlibError> {
 
     savedir.push("blight.save");
 
-    if fs::write(&savedir, format!("{} {}", device.name, device.current)).is_err() {
+    if fs::write(&savedir, format!("{} {}", device.name(), device.current())).is_err() {
         return Err(BlibError::WriteToSaveFile(savedir));
     };
 
