@@ -48,9 +48,9 @@ pub enum Change {
 /// ```
 #[derive(Debug)]
 pub struct Device {
-    pub name: String,
-    pub current: u16,
-    pub max: u16,
+    name: String,
+    current: u16,
+    max: u16,
     device_dir: String,
 }
 
@@ -66,6 +66,18 @@ impl Device {
         };
         let device = Self::load(name)?;
         Ok(device)
+    }
+
+    pub fn name(&self) -> &str {
+        self.name.as_str()
+    }
+
+    pub fn current(&self) -> u16 {
+        self.current
+    }
+
+    pub fn max(&self) -> u16 {
+        self.max
     }
 
     fn load(name: String) -> BlResult<Device> {
