@@ -46,7 +46,7 @@ pub enum Change {
 /// let bl = Device::new(None)?;
 /// bl.write_value(50)?;
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Device {
     name: String,
     current: u16,
@@ -119,6 +119,19 @@ impl Device {
         } else {
             Err(BlibError::NoDeviceFound)
         }
+    }
+
+    /// Reloads max and current values for the current device in place.
+    /// # Panics
+    /// The method panics if either max or current values fail to be read from the filesystem.
+    pub fn reload(&mut self) {
+        let dd = &self.device_dir;
+        *self = Device {
+            max: Device::get_max(dd).unwrap(),
+            current: Device::get_current(dd).unwrap(),
+            name: std::mem::take(&mut self.name),
+            device_dir: std::mem::take(&mut self.device_dir),
+        };
     }
 
     fn get_max(device_dir: &str) -> BlResult<u16> {
