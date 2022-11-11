@@ -68,14 +68,17 @@ impl Device {
         Ok(device)
     }
 
+    /// Returns the name of the current device
     pub fn name(&self) -> &str {
         self.name.as_str()
     }
 
+    /// Returns the current brightness value of the current device
     pub fn current(&self) -> u16 {
         self.current
     }
 
+    /// Returns the max brightness value of the current device
     pub fn max(&self) -> u16 {
         self.max
     }
