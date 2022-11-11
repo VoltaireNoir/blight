@@ -1,17 +1,14 @@
-//! # About
-//! **blight is a hassle-free CLI for managing backlight on Linux; one that plays well with hybrid GPU configuration and proprietary drivers..** \
-//! \
-//! > **Note:** You need write permission for the file `/sys/class/backlight/{your_device}/brightness` for this utility to work.
-//! > Read more about it [here](https://wiki.archlinux.org/title/Backlight#ACPI).
-//! ## Common commands
-//! - `blight inc`
-//! - `blight dec`
-//! - `blight set`
-//! - `blight status`
-//! - `blight sweep-up`
-//! - `blight sweep-down`
+//! blight is primarily a CLI backlight utility for Linux which is focused on providing hassle-free backlight control. Two features of blight that standout are:
+//! 1. Prioritizing device detection in this order: iGPU>dGPU>ACPI>Fallback device.
+//! 2. Smooth backlight change by writing in increments/decrements of 1 with a few milliseconds of delay.
 //!
-//! Run `blight` in terminal to display all supported commands and options
+//! However, the parts which blight relies on to make backlight changes, are also exposed through the library aspect of this crate, which can be used like any other Rust library
+//! by using the command `cargo add blight` in your Rust project. The CLI utility, on the other hand, can be installed by running `cargo install blight`.
+//! This documentation only covers the library aspect, for CLI related docs, visit the project's [Github repo](https://github.com/voltaireNoir/blight).
+//! \
+//! > **IMPORTANT:** You need write permission for the file `/sys/class/backlight/{your_device}/brightness` to change brightness.
+//! > The CLI utility comes with a helper script that let's you gain access to the brightness file (which may not always work), which you can run by using the command `sudo blight setup`.
+//! > If you're only using blight as a dependency, you can read about gaining file permissions [here](https://wiki.archlinux.org/title/Backlight#ACPI).
 
 use err::BlibError;
 use std::{fs, path::PathBuf, thread, time::Duration};
@@ -22,7 +19,7 @@ pub const BLDIR: &str = "/sys/class/backlight";
 
 type BlResult<T> = Result<T, BlibError>;
 
-/// This enum is used to specify the direction in which the backlight should be changed.
+/// This enum is used to specify the direction in which the backlight should be changed in the [change_bl] and [sweep] functions.
 /// Inc -> Increase, Dec -> Decrease.
 #[derive(Clone, Copy)]
 pub enum Direction {
@@ -30,7 +27,7 @@ pub enum Direction {
     Dec,
 }
 
-/// This enum is used to specify the kind of backlight change to carry out. \
+/// This enum is used to specify the kind of backlight change to carry out while calling the [change_bl] function. \
 /// Regular change applies the calculated change directly, whereas the sweep change occurs in incremental steps.
 #[derive(Default)]
 pub enum Change {
@@ -39,7 +36,16 @@ pub enum Change {
     Sweep,
 }
 
-/// Contains name of the detected GPU device and its current and max brightness values.
+/// An abstraction of a backlight device containing a name, current and max backlight values, and some related functionality. \
+/// A Device instance is created by using the [constructor][Device::new], values are read from /sys/class/backlight/ directory based on the detected GPU device.
+/// The constructor uses the default detection method unless a device name is passed as an argument. Based on whether a device is detected, the constructor will either return Some(Device) or None,
+/// if no device is detected. \
+/// This is how the devices are priorirized AmdGPU or Intel > Nvdia > ACPI > Any Fallback Device, unless a device name is passed as an argument.
+/// # Examples
+/// ```ignore
+/// let bl = Device::new(None)?;
+/// bl.write_value(50)?;
+/// ```
 #[derive(Debug)]
 pub struct Device {
     pub name: String,
@@ -49,9 +55,6 @@ pub struct Device {
 }
 
 impl Device {
-    /// Creates a new Device instance by reading values from /sys/class/backlight/ directory based on the detected GPU device.\
-    /// Returns the Device struct wrapped in Some() or returns None when no known device is detected \
-    /// This is how the devices are priorirized AmdGPU or Intel > Nvdia > ACPI > Any Fallback Device
     pub fn new(name: Option<String>) -> BlResult<Device> {
         let name = if let Some(n) = name {
             PathBuf::from(format!("{BLDIR}/{n}/brightness"))
@@ -123,8 +126,7 @@ impl Device {
             .or(Err(BlibError::ReadCurrent))?;
         Ok(current)
     }
-    /// This method is used to write to the brightness file containted in /sys/class/backlight/ dir of the respective detected device.\
-    /// It takes in a brightness value, and writes to othe relavant brightness file.
+    /// Writes to the brightness file containted in /sys/class/backlight/ dir of the respective detected device, which will result in change of brightness if successful and if the chosen device is the correct one.
     pub fn write_value(&self, value: u16) -> BlResult<()> {
         fs::write(
             format!("{}/brightness", self.device_dir),
@@ -157,9 +159,9 @@ pub fn calculate_change(current: u16, max: u16, step_size: u16, dir: &Direction)
     }
 }
 
-/// Changes backlight based on step-size (percentage), change type and direction.
-/// Regular change uses calculated change value based on step size and is applied instantly
-/// Sweep change on the other hand, occurs gradually, producing a fade or sweeping effect.
+/// A helper function to change backlight based on step-size (percentage), [Change] type and [Direction].
+/// Regular change uses [calculated change][calculate_change] value based on step size and is applied instantly.
+/// Sweep change on the other hand, occurs gradually, producing a fade or sweeping effect. (For more info, read about [sweep])
 pub fn change_bl(
     step_size: u16,
     ch: Change,
@@ -178,9 +180,16 @@ pub fn change_bl(
     Ok(())
 }
 
-/// This function takes a brightness value, creates a Device struct, and writes the value to the brightness file
-/// as long as the given value falls under the min and max bounds.
-/// Unlike change_bl, this function does not calculate any change, it writes the given value directly.
+/// A helper function which takes a brightness value and writes the value to the brightness file
+/// as long as the given value falls under the min and max bounds of the detected backlight device.
+/// *Note: Unlike [change_bl], this function does not calculate any change, it writes the given value directly.*
+/// # Examples
+/// ```ignore
+/// blight::set_bl(15, None)?;
+/// ```
+/// ```ignore
+/// blight::set_bl(50, Some("nvidia_0".into()))?;
+/// ````
 pub fn set_bl(val: u16, device_name: Option<String>) -> Result<(), BlibError> {
     let device = Device::new(device_name)?;
 
@@ -190,8 +199,8 @@ pub fn set_bl(val: u16, device_name: Option<String>) -> Result<(), BlibError> {
     Ok(())
 }
 
-/// This function takes a borrow of Device struct, a calculated change value and the direction.
-/// It writes to the relavant brightness file in an increment of 1 on each loop until change value is reached.
+/// This function takes a borrow of a Device instance, a [calculated change][calculate_change] value and the [Direction].
+/// It writes to the brightness file in an increment of 1 on each loop until change value is reached.
 /// Each loop has a delay of 25ms, to produce to a smooth sweeping effect when executed.
 pub fn sweep(device: &Device, change: u16, dir: &Direction) -> Result<(), BlibError> {
     match dir {
@@ -316,21 +325,6 @@ mod tests {
         let ch = calculate_change(10, 100, 20, &Direction::Dec);
         assert_eq!(ch, 0)
     }
-
-    /*#[test]
-    fn write_permission_not_ok() {
-        clean_up();
-        setup_test_env(&["generic"]).unwrap();
-        fs::File::open(format!("{TESTDIR}/generic/brightness"))
-            .and_then(|f| {
-                let mut p = f.metadata().unwrap().permissions();
-                p.set_readonly(true);
-                f.set_permissions(p)
-            })
-            .unwrap();
-        assert!(check_write_perm("generic", TESTDIR).is_err());
-        clean_up();
-    }*/
 
     fn setup_test_env(dirs: &[&str]) -> Result<(), Box<dyn Error>> {
         fs::create_dir(TESTDIR)?;
