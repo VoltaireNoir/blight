@@ -30,6 +30,7 @@ pub enum Direction {
 }
 
 /// This enum is used to specify the kind of backlight change to carry out while calling the [change_bl] function. \
+///
 /// Regular change applies the calculated change directly, whereas the sweep change occurs in incremental steps.
 #[derive(Default, Clone, Copy)]
 pub enum Change {
@@ -38,11 +39,12 @@ pub enum Change {
     Sweep,
 }
 
-/// An abstraction of a backlight device containing a name, current and max backlight values, and some related functionality. \
+/// An abstraction of a backlight device containing a name, current and max backlight values, and some related functionality.
+///
 /// A Device instance is created by using the [constructor][Device::new], values are read from /sys/class/backlight/ directory based on the detected GPU device.
 /// The constructor uses the default detection method unless a device name is passed as an argument. Based on whether a device is detected, the constructor will either return Some(Device) or None,
 /// if no device is detected. \
-/// This is how the devices are priorirized AmdGPU or Intel > Nvdia > ACPI > Any Fallback Device, unless a device name is passed as an argument.
+/// This is how the devices are priorirized: ``AmdGPU or Intel > Nvdia > ACPI > Any Fallback Device``, unless a device name is passed as an argument.
 /// # Examples
 /// ```ignore
 /// let bl = Device::new(None)?;
@@ -57,6 +59,15 @@ pub struct Device {
 }
 
 impl Device {
+    /// Constructor for creating a [Device] instance.
+    ///
+    /// By default, it uses the priority detection method unless ``Some(device_name)`` is passed as an argument, then that name will be used to create an instance of that device if it exists.
+    /// # Errors
+    /// Possible errors that can result from this function include:
+    /// * [``BlibError::NoDeviceFound``]
+    /// * [``BlibError::ReadBlDir``]
+    /// * [``BlibError::ReadCurrent``]
+    /// * [``BlibError::ReadMax``]
     pub fn new(name: Option<String>) -> BlResult<Device> {
         let name = if let Some(n) = name {
             PathBuf::from(format!("{BLDIR}/{n}/brightness"))
@@ -190,6 +201,7 @@ pub fn calculate_change(current: u16, max: u16, step_size: u16, dir: &Direction)
 }
 
 /// A helper function to change backlight based on step-size (percentage), [Change] type and [Direction].
+///
 /// Regular change uses [calculated change][calculate_change] value based on step size and is applied instantly.
 /// Sweep change on the other hand, occurs gradually, producing a fade or sweeping effect. (For more info, read about [sweep])
 pub fn change_bl(
