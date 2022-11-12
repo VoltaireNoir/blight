@@ -10,6 +10,7 @@ use colored::Colorize;
 /// > Note: The Display trait implementations are created for the CLI use in mind, and may not be suitable to be used in a general context.
 #[derive(Debug)]
 pub enum BlibError {
+    ReadBlDir(std::io::Error),
     NoDeviceFound,
     WriteNewVal { err: std::io::Error, dev: String },
     ReadMax,
@@ -25,6 +26,8 @@ impl std::fmt::Display for BlibError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use BlibError::*;
         match self {
+            ReadBlDir(e) => write!(f, "Failed to read {} directory\n{e}", super::BLDIR),
+
             NoDeviceFound => write!(f, "No known backlight device detected"),
 
             WriteNewVal { err, dev } => {

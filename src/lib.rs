@@ -96,13 +96,15 @@ impl Device {
     }
 
     fn detect_device(bldir: &str) -> BlResult<String> {
-        let dirs = fs::read_dir(bldir).expect("Failed to read dir");
+        let dirs = fs::read_dir(bldir)
+            .map_err(BlibError::ReadBlDir)?
+            .filter_map(|d| d.ok().map(|d| d.file_name()));
+
         let (mut nv, mut ac, mut fl): (Option<String>, Option<String>, Option<String>) =
             (None, None, None);
 
         for entry in dirs {
-            let name = entry.unwrap().file_name();
-            if let Some(name) = name.to_str() {
+            if let Some(name) = entry.to_str() {
                 if name.contains("amdgpu") || name.contains("intel") {
                     return Ok(name.to_string());
                 } else if nv.is_none() && (name.contains("nvidia") | name.contains("nv")) {
