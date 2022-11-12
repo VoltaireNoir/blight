@@ -204,6 +204,9 @@ pub fn calculate_change(current: u16, max: u16, step_size: u16, dir: &Direction)
 ///
 /// Regular change uses [calculated change][calculate_change] value based on step size and is applied instantly.
 /// Sweep change on the other hand, occurs gradually, producing a fade or sweeping effect. (For more info, read about [sweep])
+/// Possible errors that can result from this function include:
+/// * All errors that can result from [``Device::new``]
+/// * [``BlibError::WriteNewVal``]
 pub fn change_bl(
     step_size: u16,
     ch: Change,
@@ -224,6 +227,7 @@ pub fn change_bl(
 
 /// A helper function which takes a brightness value and writes the value to the brightness file
 /// as long as the given value falls under the min and max bounds of the detected backlight device.
+///
 /// *Note: Unlike [change_bl], this function does not calculate any change, it writes the given value directly.*
 /// # Examples
 /// ```ignore
@@ -232,6 +236,9 @@ pub fn change_bl(
 /// ```ignore
 /// blight::set_bl(50, Some("nvidia_0".into()))?;
 /// ````
+/// Possible errors that can result from this function include:
+/// * All errors that can result from [``Device::new``]
+/// * [``BlibError::WriteNewVal``]
 pub fn set_bl(val: u16, device_name: Option<String>) -> Result<(), BlibError> {
     let device = Device::new(device_name)?;
 
@@ -242,8 +249,11 @@ pub fn set_bl(val: u16, device_name: Option<String>) -> Result<(), BlibError> {
 }
 
 /// This function takes a borrow of a Device instance, a [calculated change][calculate_change] value and the [Direction].
+///
 /// It writes to the brightness file in an increment of 1 on each loop until change value is reached.
 /// Each loop has a delay of 25ms, to produce to a smooth sweeping effect when executed.
+/// Possible errors that can result from this function include:
+/// * [``BlibError::WriteNewVal``]
 pub fn sweep(device: &Device, change: u16, dir: &Direction) -> Result<(), BlibError> {
     match dir {
         Direction::Inc => {
