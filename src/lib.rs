@@ -1,11 +1,13 @@
-//! blight is primarily a CLI backlight utility for Linux which is focused on providing hassle-free backlight control. Two features of blight that standout are:
-//! 1. Prioritizing device detection in this order: iGPU>dGPU>ACPI>Fallback device.
-//! 2. Smooth backlight change by writing in increments/decrements of 1 with a few milliseconds of delay.
-//!
+#![warn(clippy::pedantic)]
+//! # About
+//! blight is primarily a CLI backlight utility for Linux which is focused on providing hassle-free backlight control.
 //! However, the parts which blight relies on to make backlight changes, are also exposed through the library aspect of this crate, which can be used like any other Rust library
 //! by using the command `cargo add blight` in your Rust project. The CLI utility, on the other hand, can be installed by running `cargo install blight`.
 //! This documentation only covers the library aspect, for CLI related docs, visit the project's [Github repo](https://github.com/voltaireNoir/blight).
-//! \
+//!
+//! Two features of blight that standout:
+//! 1. Prioritizing device detection in this order: iGPU>dGPU>ACPI>Fallback device.
+//! 2. Smooth backlight change by writing in increments/decrements of 1 with a few milliseconds of delay. \
 //! > **IMPORTANT:** You need write permission for the file `/sys/class/backlight/{your_device}/brightness` to change brightness.
 //! > The CLI utility comes with a helper script that let's you gain access to the brightness file (which may not always work), which you can run by using the command `sudo blight setup`.
 //! > If you're only using blight as a dependency, you can read about gaining file permissions [here](https://wiki.archlinux.org/title/Backlight#ACPI).
@@ -29,7 +31,7 @@ pub enum Direction {
 
 /// This enum is used to specify the kind of backlight change to carry out while calling the [change_bl] function. \
 /// Regular change applies the calculated change directly, whereas the sweep change occurs in incremental steps.
-#[derive(Default)]
+#[derive(Default, Clone, Copy)]
 pub enum Change {
     #[default]
     Regular,
@@ -160,11 +162,9 @@ impl Device {
             format!("{}/brightness", self.device_dir),
             format!("{value}"),
         )
-        .or_else(|err| {
-            Err(BlibError::WriteNewVal {
-                err,
-                dev: self.name.clone(),
-            })
+        .map_err(|err| BlibError::WriteNewVal {
+            err,
+            dev: self.name.clone(),
         })?;
 
         Ok(())
@@ -250,7 +250,7 @@ pub fn sweep(device: &Device, change: u16, dir: &Direction) -> Result<(), BlibEr
                 if val == 0 {
                     break;
                 }
-                val -= 1
+                val -= 1;
             }
         }
     }
@@ -333,25 +333,25 @@ mod tests {
     #[test]
     fn inc_calculation() {
         let ch = calculate_change(10, 100, 10, &Direction::Inc);
-        assert_eq!(ch, 20)
+        assert_eq!(ch, 20);
     }
 
     #[test]
     fn dec_calculation() {
         let ch = calculate_change(30, 100, 10, &Direction::Dec);
-        assert_eq!(ch, 20)
+        assert_eq!(ch, 20);
     }
 
     #[test]
     fn inc_calculation_max() {
         let ch = calculate_change(90, 100, 20, &Direction::Inc);
-        assert_eq!(ch, 100)
+        assert_eq!(ch, 100);
     }
 
     #[test]
     fn dec_calculation_max() {
         let ch = calculate_change(10, 100, 20, &Direction::Dec);
-        assert_eq!(ch, 0)
+        assert_eq!(ch, 0);
     }
 
     fn setup_test_env(dirs: &[&str]) -> Result<(), Box<dyn Error>> {
@@ -369,7 +369,7 @@ mod tests {
             .unwrap()
             .any(|dir| dir.unwrap().file_name().as_os_str() == "testbldir")
         {
-            fs::remove_dir_all(TESTDIR).expect("Failed to clean up testing backlight directory.")
+            fs::remove_dir_all(TESTDIR).expect("Failed to clean up testing backlight directory.");
         }
     }
 }
