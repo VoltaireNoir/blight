@@ -187,6 +187,8 @@ impl Device {
 
 /// Calculates the new value to be written to the brightness file based on the provided step-size (percentage) and direction,
 /// for the given current and max values of the detected GPU device.
+///
+/// This function is used internally in [change_bl] function to calculate the final change value based on the given percentage.
 pub fn calculate_change(current: u16, max: u16, step_size: u16, dir: &Direction) -> u16 {
     let step: u16 = (max as f32 * (step_size as f32 / 100.0)) as u16;
     let change: u16 = match dir {
