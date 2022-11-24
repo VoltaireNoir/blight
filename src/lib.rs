@@ -17,6 +17,7 @@ use std::{fs, path::PathBuf, thread, time::Duration};
 
 pub mod err;
 
+/// Linux backlight directory location. All backlight hardware devices appear here.
 pub const BLDIR: &str = "/sys/class/backlight";
 
 type BlResult<T> = Result<T, BlibError>;
@@ -204,6 +205,7 @@ pub fn calculate_change(current: u16, max: u16, step_size: u16, dir: &Direction)
 ///
 /// Regular change uses [calculated change][calculate_change] value based on step size and is applied instantly.
 /// Sweep change on the other hand, occurs gradually, producing a fade or sweeping effect. (For more info, read about [sweep])
+/// # Errors
 /// Possible errors that can result from this function include:
 /// * All errors that can result from [``Device::new``]
 /// * [``BlibError::WriteNewVal``]
@@ -236,6 +238,7 @@ pub fn change_bl(
 /// ```ignore
 /// blight::set_bl(50, Some("nvidia_0".into()))?;
 /// ````
+/// # Errors
 /// Possible errors that can result from this function include:
 /// * All errors that can result from [``Device::new``]
 /// * [``BlibError::WriteNewVal``]
@@ -252,6 +255,7 @@ pub fn set_bl(val: u16, device_name: Option<String>) -> Result<(), BlibError> {
 ///
 /// It writes to the brightness file in an increment of 1 on each loop until change value is reached.
 /// Each loop has a delay of 25ms, to produce to a smooth sweeping effect when executed.
+/// # Errors
 /// Possible errors that can result from this function include:
 /// * [``BlibError::WriteNewVal``]
 pub fn sweep(device: &Device, change: u16, dir: &Direction) -> Result<(), BlibError> {
