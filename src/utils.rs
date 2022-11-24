@@ -135,7 +135,7 @@ impl std::fmt::Display for BlightError {
         match self {
             UnrecognisedCommand => write!(
                 f,
-                "Unrecognised command entered\n{} Try blight help to see all commands",
+                "Unrecognised command entered\n{} Try 'blight help' to see all commands",
                 "Tip".yellow().bold()
             ),
             MissingValue => write!(f, "Required argument was not provided for the command"),
