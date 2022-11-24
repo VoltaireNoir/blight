@@ -226,7 +226,10 @@ pub fn print_help() {
             "save [flags: dev]",
             "-> save current brightness value to restore later",
         ),
-        ("restore [opt dev]", "-> restore saved brightness value\n"),
+        (
+            "restore [flags: dev]",
+            "-> restore saved brightness value\n",
+        ),
         (
             "setup",
             "-> installs udev rules and adds user to video group (run with sudo)",
