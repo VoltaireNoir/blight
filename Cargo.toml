@@ -16,4 +16,5 @@ colored = "2.0.0"
 [profile.release]
 strip = true
 lto = true
+codegen-units = 1
 panic = 'abort'
