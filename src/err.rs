@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use colored::Colorize;
 
+pub type BlResult<T> = Result<T, BlibError>;
 /// All blight library related errors in one place. Every time one of the functions or methods of the library return an error, it'll always be one of this enum's variants.
 /// Some variants wrap additional error information and all of them have their separate Display trait implementations, containing a simple description of the error and possibly
 /// a tip to help the user fix it.

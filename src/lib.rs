@@ -16,11 +16,10 @@ use err::BlibError;
 use std::{fs, path::PathBuf, thread, time::Duration};
 
 pub mod err;
+pub use err::BlResult;
 
 /// Linux backlight directory location. All backlight hardware devices appear here.
 pub const BLDIR: &str = "/sys/class/backlight";
-
-type BlResult<T> = Result<T, BlibError>;
 
 /// This enum is used to specify the direction in which the backlight should be changed in the [change_bl] and [sweep] functions.
 /// Inc -> Increase, Dec -> Decrease.
