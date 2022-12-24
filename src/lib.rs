@@ -13,7 +13,7 @@
 //! > If you're only using blight as a dependency, you can read about gaining file permissions [here](https://wiki.archlinux.org/title/Backlight#ACPI).
 
 use err::BlibError;
-use std::{fs, path::PathBuf, thread, time::Duration};
+use std::{borrow::Cow, fs, path::PathBuf, thread, time::Duration};
 
 pub mod err;
 pub use err::BlResult;
@@ -68,7 +68,7 @@ impl Device {
     /// * [``BlibError::ReadBlDir``]
     /// * [``BlibError::ReadCurrent``]
     /// * [``BlibError::ReadMax``]
-    pub fn new(name: Option<String>) -> BlResult<Device> {
+    pub fn new(name: Option<Cow<str>>) -> BlResult<Device> {
         let name = if let Some(n) = name {
             PathBuf::from(format!("{BLDIR}/{n}/brightness"))
                 .is_file()
@@ -77,7 +77,7 @@ impl Device {
         } else {
             Self::detect_device(BLDIR)?
         };
-        let device = Self::load(name)?;
+        let device = Self::load(&name)?;
         Ok(device)
     }
 
@@ -99,17 +99,17 @@ impl Device {
         self.max
     }
 
-    fn load(name: String) -> BlResult<Device> {
+    fn load(name: &str) -> BlResult<Device> {
         let device_dir = format!("{BLDIR}/{name}");
         Ok(Device {
             current: Self::get_current(&device_dir)?,
             max: Self::get_max(&device_dir)?,
             device_dir,
-            name,
+            name: name.into(),
         })
     }
 
-    fn detect_device(bldir: &str) -> BlResult<String> {
+    fn detect_device(bldir: &str) -> BlResult<Cow<str>> {
         let dirs = fs::read_dir(bldir)
             .map_err(BlibError::ReadBlDir)?
             .filter_map(|d| d.ok().map(|d| d.file_name()));
@@ -118,25 +118,25 @@ impl Device {
             (None, None, None);
 
         for entry in dirs {
-            if let Some(name) = entry.to_str() {
-                if name.contains("amdgpu") || name.contains("intel") {
-                    return Ok(name.to_string());
-                } else if nv.is_none() && (name.contains("nvidia") | name.contains("nv")) {
-                    nv = Some(name.to_string());
-                } else if ac.is_none() && name.contains("acpi") {
-                    ac = Some(name.to_string());
-                } else {
-                    fl = Some(name.to_string());
-                }
+            let name = entry.to_string_lossy();
+            if name.contains("amdgpu") || name.contains("intel") {
+                return Ok(name.into_owned().into());
+            } else if nv.is_none() && (name.contains("nvidia") | name.contains("nv")) {
+                nv = Some(name.into());
+                break;
+            } else if ac.is_none() && name.contains("acpi") {
+                ac = Some(name.into());
+                break;
             }
+            fl = Some(name.into());
         }
 
         if let Some(nv) = nv {
-            Ok(nv)
+            Ok(nv.into())
         } else if let Some(ac) = ac {
-            Ok(ac)
+            Ok(ac.into())
         } else if let Some(fl) = fl {
-            Ok(fl)
+            Ok(fl.into())
         } else {
             Err(BlibError::NoDeviceFound)
         }
@@ -218,7 +218,7 @@ pub fn change_bl(
     step_size: u16,
     ch: Change,
     dir: Direction,
-    device_name: Option<String>,
+    device_name: Option<Cow<str>>,
 ) -> Result<(), BlibError> {
     let device = Device::new(device_name)?;
 
@@ -247,7 +247,7 @@ pub fn change_bl(
 /// Possible errors that can result from this function include:
 /// * All errors that can result from [``Device::new``]
 /// * [``BlibError::WriteNewVal``]
-pub fn set_bl(val: u16, device_name: Option<String>) -> Result<(), BlibError> {
+pub fn set_bl(val: u16, device_name: Option<Cow<str>>) -> Result<(), BlibError> {
     let device = Device::new(device_name)?;
 
     if val <= device.max && val != device.current {

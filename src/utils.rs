@@ -5,15 +5,15 @@ use blight::{
     BLDIR,
 };
 use colored::Colorize;
-use std::{env, env::Args, fs, iter::Skip, path::PathBuf, process};
+use std::{borrow::Cow, env, env::Args, fs, iter::Skip, path::PathBuf, process};
 
 mod setup;
 
 const SAVEDIR: &str = "/.local/share/blight";
 
-pub struct Config {
+pub struct Config<'a> {
     command: Command,
-    options: Options,
+    options: Options<'a>,
 }
 
 enum Command {
@@ -29,20 +29,20 @@ enum Command {
 }
 
 #[derive(Default)]
-struct Options {
-    device: Option<String>,
+struct Options<'a> {
+    device: Option<Cow<'a, str>>,
     sweep: Change,
 }
 
-impl Options {
-    fn set(mut self, arg: &str) -> Self {
-        match arg {
-            "-d" | "--device" => self.device = Some(String::new()),
+impl Options<'_> {
+    fn set(mut self, arg: String) -> Self {
+        match arg.as_str() {
+            "-d" | "--device" => self.device = Some("".into()),
             "-s" | "--sweep" => self.sweep = Change::Sweep,
-            name => {
+            _ => {
                 if let Some(d) = &mut self.device {
                     if d.is_empty() {
-                        d.push_str(name)
+                        *d = Cow::from(arg);
                     }
                 }
             }
@@ -51,13 +51,12 @@ impl Options {
     }
 }
 
-pub fn parse(mut args: Skip<Args>) -> Result<Config, BlightError> {
+pub fn parse<'a>(mut args: Skip<Args>) -> Result<Config<'a>, BlightError> {
     use BlightError::*;
     use Command::*;
 
-    let option_parser = |args: Skip<Args>| -> Options {
-        args.fold(Options::default(), |op, arg| op.set(arg.as_str()))
-    };
+    let option_parser =
+        |args: Skip<Args>| -> Options { args.fold(Options::default(), |op, arg| op.set(arg)) };
 
     let no_op = |cm: Command| (cm, Options::default());
 
@@ -186,7 +185,7 @@ fn check_write_perm(device_name: &str, bldir: &str) -> Result<(), std::io::Error
         .and(Ok(()))
 }
 
-pub fn print_status(device_name: Option<String>) -> Result<(), BlibError> {
+pub fn print_status(device_name: Option<Cow<str>>) -> Result<(), BlibError> {
     let device = Device::new(device_name)?;
 
     let write_perm = match check_write_perm(device.name(), BLDIR) {
@@ -279,7 +278,7 @@ pub fn print_shelp() {
     );
 }
 
-pub fn save(device_name: Option<String>) -> Result<(), BlibError> {
+pub fn save(device_name: Option<Cow<str>>) -> Result<(), BlibError> {
     let device = Device::new(device_name)?;
     let mut savedir = PathBuf::from(env::var("HOME").unwrap() + SAVEDIR);
 
@@ -306,7 +305,7 @@ pub fn restore() -> Result<(), BlibError> {
     };
 
     let (device_name, val) = restore.split_once(' ').unwrap();
-    let device = Device::new(Some(device_name.to_string()))?;
+    let device = Device::new(Some(device_name.into()))?;
 
     let value: u16 = val.parse().or(Err(BlibError::SaveParseErr))?;
     device.write_value(value)?;
