@@ -23,7 +23,7 @@ pub const BLDIR: &str = "/sys/class/backlight";
 
 /// This enum is used to specify the direction in which the backlight should be changed in the [change_bl] and [sweep] functions.
 /// Inc -> Increase, Dec -> Decrease.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Direction {
     Inc,
     Dec,
@@ -32,7 +32,7 @@ pub enum Direction {
 /// This enum is used to specify the kind of backlight change to carry out while calling the [change_bl] function. \
 ///
 /// Regular change applies the calculated change directly, whereas the sweep change occurs in incremental steps.
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Change {
     #[default]
     Regular,
@@ -82,16 +82,19 @@ impl Device {
     }
 
     /// Returns the name of the current device
+    #[must_use]
     pub fn name(&self) -> &str {
         self.name.as_str()
     }
 
     /// Returns the current brightness value of the current device
+    #[must_use]
     pub fn current(&self) -> u16 {
         self.current
     }
 
     /// Returns the max brightness value of the current device
+    #[must_use]
     pub fn max(&self) -> u16 {
         self.max
     }
@@ -188,6 +191,7 @@ impl Device {
 /// for the given current and max values of the detected GPU device.
 ///
 /// This function is used internally in [change_bl] function to calculate the final change value based on the given percentage.
+#[must_use]
 pub fn calculate_change(current: u16, max: u16, step_size: u16, dir: &Direction) -> u16 {
     let step: u16 = (max as f32 * (step_size as f32 / 100.0)) as u16;
     let change: u16 = match dir {
