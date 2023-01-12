@@ -222,8 +222,9 @@ impl Device {
 
 /// A helper function to change backlight based on step-size (percentage), [Change] type and [Direction].
 ///
-/// Regular change uses [calculated change][calculate_change] value based on step size and is applied instantly.
+/// Regular change uses [calculated change][Device::calculate_change] value based on step size and is applied instantly.
 /// Sweep change on the other hand, occurs gradually, producing a fade or sweeping effect. (For more info, read about [sweep])
+/// > Note: No change is applied if the final calculated value is the same as current brightness value
 /// # Errors
 /// Possible errors that can result from this function include:
 /// * All errors that can result from [``Device::new``]
@@ -247,7 +248,7 @@ pub fn change_bl(
 }
 
 /// A helper function which takes a brightness value and writes the value to the brightness file
-/// as long as the given value falls under the min and max bounds of the detected backlight device.
+/// as long as the given value falls under the min and max bounds of the detected backlight device and is different from the current value.
 ///
 /// *Note: Unlike [change_bl], this function does not calculate any change, it writes the given value directly.*
 /// # Examples
