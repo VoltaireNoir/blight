@@ -1,15 +1,17 @@
 use blight::{
-    err::BlibError,
+    err::{BlibError, Tip},
     Change, Device,
     Direction::{self, Dec, Inc},
     BLDIR,
 };
 use colored::Colorize;
-use std::{borrow::Cow, env, env::Args, fs, iter::Skip, path::PathBuf, process};
+use std::{borrow::Cow, env, env::Args, error::Error, fs, iter::Skip, path::PathBuf, process};
 
 mod setup;
 
 const SAVEDIR: &str = "/.local/share/blight";
+
+type ErrnTip = (Box<dyn Error>, Option<Cow<'static, str>>);
 
 pub struct Config<'a> {
     command: Command,
@@ -51,7 +53,7 @@ impl Options<'_> {
     }
 }
 
-pub fn parse<'a>(mut args: Skip<Args>) -> Result<Config<'a>, BlightError> {
+pub fn parse<'a>(mut args: Skip<Args>) -> Result<Config<'a>, (BlightError, Option<Cow<'a, str>>)> {
     use BlightError::*;
     use Command::*;
 
@@ -72,9 +74,9 @@ pub fn parse<'a>(mut args: Skip<Args>) -> Result<Config<'a>, BlightError> {
             "set" => {
                 let val: u16 = args
                     .next()
-                    .ok_or(MissingValue)?
+                    .ok_or(MissingValue.tip())?
                     .parse()
-                    .or(Err(InvalidValue))?;
+                    .or(Err(InvalidValue.tip()))?;
 
                 (Set(val), option_parser(args))
             }
@@ -82,15 +84,15 @@ pub fn parse<'a>(mut args: Skip<Args>) -> Result<Config<'a>, BlightError> {
             ch @ ("inc" | "dec") => {
                 let value: u16 = args
                     .next()
-                    .ok_or(MissingValue)?
+                    .ok_or(MissingValue.tip())?
                     .parse()
-                    .or(Err(InvalidValue))?;
+                    .or(Err(InvalidValue.tip()))?;
 
                 let dir = if ch == "inc" { Inc } else { Dec };
 
                 (Adjust { dir, value }, option_parser(args))
             }
-            _ => return Err(UnrecognisedCommand),
+            _ => return Err(UnrecognisedCommand.tip()),
         }
     } else {
         no_op(Command::ShortHelp)
@@ -101,7 +103,7 @@ pub fn parse<'a>(mut args: Skip<Args>) -> Result<Config<'a>, BlightError> {
 
 type SuccessMessage = &'static str;
 
-pub fn execute(conf: Config) -> Result<SuccessMessage, blight::err::BlibError> {
+pub fn execute(conf: Config) -> Result<SuccessMessage, ErrnTip> {
     use Command::*;
 
     match conf.command {
@@ -109,12 +111,13 @@ pub fn execute(conf: Config) -> Result<SuccessMessage, blight::err::BlibError> {
         ShortHelp => print_shelp(),
         List => print_devices(),
         Setup => setup::run(),
-        Status => print_status(conf.options.device)?,
+        Status => print_status(conf.options.device).map_err(|e| e.boxed_tip())?,
         Save => save(conf.options.device)?,
         Restore => restore()?,
-        Set(v) => blight::set_bl(v, conf.options.device)?,
+        Set(v) => blight::set_bl(v, conf.options.device).map_err(|e| e.boxed_tip())?,
         Adjust { dir, value } => {
-            blight::change_bl(value, conf.options.sweep, dir, conf.options.device)?
+            blight::change_bl(value, conf.options.sweep, dir, conf.options.device)
+                .map_err(|e| e.boxed_tip())?
         }
     };
 
@@ -126,29 +129,54 @@ pub enum BlightError {
     UnrecognisedCommand,
     MissingValue,
     InvalidValue,
+    CreateSaveDir(PathBuf),
+    WriteToSaveFile(PathBuf),
+    ReadFromSave(std::io::Error),
+    NoSaveFound,
+    SaveParseErr,
+}
+
+impl Tip for BlightError {
+    fn tip(self) -> (Self, Option<Cow<'static, str>>) {
+        use BlightError::*;
+        let tip = match self {
+            UnrecognisedCommand => Some("try 'blight help' to see all commands".into()),
+            InvalidValue => Some("make sure the value is a valid positive integer".into()),
+            NoSaveFound => Some("try using 'blight save' first".into()),
+            MissingValue => {
+                Some("try 'blight help' to see all commands and their supported args".into())
+            }
+            ReadFromSave(_) => Some("make sure you have read permission for the save file".into()),
+            SaveParseErr => Some("delete the save file and try save-restore again".into()),
+            _ => None,
+        };
+        (self, tip)
+    }
 }
 
 impl std::fmt::Display for BlightError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use BlightError::*;
         match self {
-            UnrecognisedCommand => write!(
-                f,
-                "Unrecognised command entered\n{} Try 'blight help' to see all commands",
-                "Tip".yellow().bold()
-            ),
-            MissingValue => write!(f, "Required argument was not provided for the command"),
-            InvalidValue => write!(
-                f,
-                "Invalid value provided\n{} Make sure the value is a valid positive integer",
-                "Tip".yellow().bold()
-            ),
+            UnrecognisedCommand => write!(f, "unrecognised command entered"),
+            MissingValue => write!(f, "required argument was not provided for the command"),
+            InvalidValue => write!(f, "invalid value provided"),
+            CreateSaveDir(loc) => write!(f, "failed to create save directory at {}", loc.display()),
+            WriteToSaveFile(loc) => write!(f, "failed to write to save file at {}", loc.display()),
+            ReadFromSave(err) => write!(f, "failed to read from save file\n{err}"),
+            NoSaveFound => write!(f, "no save file found"),
+            SaveParseErr => write!(f, "failed to parse saved brightness value"),
         }
     }
 }
 
-pub fn print_err(e: impl std::fmt::Display) {
-    eprintln!("{} {e}", "Error".red().bold())
+impl Error for BlightError {}
+
+pub fn print_err(e: impl std::fmt::Display, t: Option<Cow<str>>) {
+    eprintln!("{} {e}", "Error".red().bold());
+    if let Some(tip) = t {
+        eprintln!("{} {tip}", "Tip".yellow().bold())
+    }
 }
 
 pub fn print_ok(msg: &str) {
@@ -278,36 +306,36 @@ pub fn print_shelp() {
     );
 }
 
-pub fn save(device_name: Option<Cow<str>>) -> Result<(), BlibError> {
-    let device = Device::new(device_name)?;
+pub fn save(device_name: Option<Cow<str>>) -> Result<(), ErrnTip> {
+    let device = Device::new(device_name).map_err(|e| e.boxed_tip())?;
     let mut savedir = PathBuf::from(env::var("HOME").unwrap() + SAVEDIR);
 
     if !savedir.exists() && fs::create_dir_all(&savedir).is_err() {
-        return Err(BlibError::CreateSaveDir(savedir));
+        return Err(BlightError::CreateSaveDir(savedir).boxed_tip());
     }
 
     savedir.push("blight.save");
 
     if fs::write(&savedir, format!("{} {}", device.name(), device.current())).is_err() {
-        return Err(BlibError::WriteToSaveFile(savedir));
-    };
+        Err(BlightError::WriteToSaveFile(savedir).boxed_tip())?;
+    }
 
     Ok(())
 }
 
-pub fn restore() -> Result<(), BlibError> {
+pub fn restore() -> Result<(), ErrnTip> {
     let save = PathBuf::from((env::var("HOME").unwrap() + SAVEDIR) + "/blight.save");
 
     let restore = if save.is_file() {
-        fs::read_to_string(save).map_err(BlibError::ReadFromSave)?
+        fs::read_to_string(save).map_err(|e| BlightError::ReadFromSave(e).boxed_tip())?
     } else {
-        return Err(BlibError::NoSaveFound);
+        Err(BlightError::NoSaveFound.boxed_tip())?
     };
 
     let (device_name, val) = restore.split_once(' ').unwrap();
-    let device = Device::new(Some(device_name.into()))?;
+    let device = Device::new(Some(device_name.into())).map_err(|e| e.boxed_tip())?;
 
-    let value: u16 = val.parse().or(Err(BlibError::SaveParseErr))?;
-    device.write_value(value)?;
+    let value: u16 = val.parse().or(Err(BlightError::SaveParseErr.boxed_tip()))?;
+    device.write_value(value).map_err(|e| e.boxed_tip())?;
     Ok(())
 }

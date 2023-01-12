@@ -1,14 +1,11 @@
 //! All blight library related errors in one place. See [BlibError]
 
-use std::path::PathBuf;
-
-use colored::Colorize;
+use std::{borrow::Cow, error::Error};
 
 pub type BlResult<T> = Result<T, BlibError>;
 /// All blight library related errors in one place. Every time one of the functions or methods of the library return an error, it'll always be one of this enum's variants.
 /// Some variants wrap additional error information and all of them have their separate Display trait implementations, containing a simple description of the error and possibly
 /// a tip to help the user fix it.
-/// > Note: The Display trait implementations are created for the CLI use in mind, and may not be suitable to be used in a general context.
 #[derive(Debug)]
 pub enum BlibError {
     ReadBlDir(std::io::Error),
@@ -16,11 +13,40 @@ pub enum BlibError {
     WriteNewVal { err: std::io::Error, dev: String },
     ReadMax,
     ReadCurrent,
-    CreateSaveDir(PathBuf),
-    WriteToSaveFile(PathBuf),
-    ReadFromSave(std::io::Error),
-    NoSaveFound,
-    SaveParseErr,
+}
+
+#[doc(hidden)]
+pub trait Tip: Error + 'static
+where
+    Self: Sized,
+{
+    fn tip(self) -> (Self, Option<Cow<'static, str>>);
+    fn boxed_tip(self) -> (Box<dyn Error>, Option<Cow<'static, str>>) {
+        let (s, t) = self.tip();
+        (Box::new(s), t)
+    }
+}
+
+impl Tip for BlibError {
+    fn tip(self) -> (Self, Option<Cow<'static, str>>) {
+        use BlibError::WriteNewVal;
+        let tip: Option<Cow<str>> = match &self {
+            WriteNewVal { dev, .. } => {
+                let tip_msg = format!(
+                    "{main} '{dir}/{dev}/brightness'\n{extra}",
+                    main = "Make sure you have write permission to the file",
+                    dir = super::BLDIR,
+                    extra = "
+Run `sudo blight setup` to install necessarry udev rules and add user to video group.
+Or visit https://wiki.archlinux.org/title/Backlight#Hardware_interfaces
+if you'd like to do it manually.",
+                );
+                Some(tip_msg.into())
+            }
+            _ => None,
+        };
+        (self, tip)
+    }
 }
 
 impl std::fmt::Display for BlibError {
@@ -31,40 +57,13 @@ impl std::fmt::Display for BlibError {
 
             NoDeviceFound => write!(f, "No known backlight device detected"),
 
-            WriteNewVal { err, dev } => {
-                let tip_msg = format!(
-                    "{main} '{dir}/{dev}/brightness'\n{extra}",
-                    main = "Make sure you have write permission to the file",
-                    dir = super::BLDIR,
-                    extra = "
-Run `sudo blight setup` to install necessarry udev rules and add user to video group.
-Or visit https://wiki.archlinux.org/title/Backlight#Hardware_interfaces
-if you'd like to do it manually.",
-                );
-                write!(
-                    f,
-                    "Failed to write to the brightness file ({err})\n{} {tip_msg}",
-                    "Tip".yellow().bold()
-                )
+            WriteNewVal { err, .. } => {
+                write!(f, "Failed to write to the brightness file ({err})",)
             }
 
             ReadCurrent => write!(f, "Failed to read current brightness value"),
 
             ReadMax => write!(f, "Failed to read max brightness value"),
-
-            CreateSaveDir(loc) => write!(f, "Failed to create save directory at {}", loc.display()),
-
-            WriteToSaveFile(loc) => write!(f, "Failed to write to save file at {}", loc.display()),
-
-            ReadFromSave(err) => write!(f, "Failed to read from save file\n{err}"),
-
-            NoSaveFound => write!(
-                f,
-                "No save file found\n{} Try using 'blight save' first",
-                "Tip:".yellow().bold()
-            ),
-
-            SaveParseErr => write!(f, "Failed to parse saved brightness value"),
         }
     }
 }
