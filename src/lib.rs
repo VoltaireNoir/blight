@@ -83,7 +83,7 @@ impl Device {
 
     /// Returns the name of the current device
     pub fn name(&self) -> &str {
-        self.name.as_str()
+        &self.name
     }
 
     /// Returns the current brightness value of the current device
