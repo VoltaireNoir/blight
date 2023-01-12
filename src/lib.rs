@@ -75,9 +75,9 @@ impl Device {
                 .then_some(n)
                 .ok_or(BlibError::NoDeviceFound)?
         } else {
-            Self::detect_device(BLDIR)?
+            Cow::from(Self::detect_device(BLDIR)?)
         };
-        let device = Self::load(&name)?;
+        let device = Self::load(name)?;
         Ok(device)
     }
 
@@ -96,7 +96,7 @@ impl Device {
         self.max
     }
 
-    fn load(name: &str) -> BlResult<Device> {
+    fn load(name: Cow<str>) -> BlResult<Device> {
         let device_dir = format!("{BLDIR}/{name}");
         Ok(Device {
             current: Self::get_current(&device_dir)?,
@@ -106,34 +106,33 @@ impl Device {
         })
     }
 
-    fn detect_device(bldir: &str) -> BlResult<Cow<str>> {
-        let dirs = fs::read_dir(bldir)
+    fn detect_device(bldir: &str) -> BlResult<String> {
+        let dirs: Vec<_> = fs::read_dir(bldir)
             .map_err(BlibError::ReadBlDir)?
-            .filter_map(|d| d.ok().map(|d| d.file_name()));
+            .filter_map(|d| d.ok().map(|d| d.file_name()))
+            .collect();
 
-        let (mut nv, mut ac, mut fl): (Option<String>, Option<String>, Option<String>) =
-            (None, None, None);
+        let (mut nv, mut ac): (Option<usize>, Option<usize>) = (None, None);
 
-        for entry in dirs {
+        for (i, entry) in dirs.iter().enumerate() {
             let name = entry.to_string_lossy();
-            if name.contains("amdgpu") || name.contains("intel") {
-                return Ok(name.into_owned().into());
+            if name.contains("amd") || name.contains("intel") {
+                return Ok(name.into_owned());
             } else if nv.is_none() && (name.contains("nvidia") | name.contains("nv")) {
-                nv = Some(name.into());
-                break;
+                nv = Some(i);
             } else if ac.is_none() && name.contains("acpi") {
-                ac = Some(name.into());
-                break;
+                ac = Some(i);
             }
-            fl = Some(name.into());
         }
 
+        let to_str = |i: usize| Ok(dirs[i].to_string_lossy().into_owned());
+
         if let Some(nv) = nv {
-            Ok(nv.into())
+            to_str(nv)
         } else if let Some(ac) = ac {
-            Ok(ac.into())
-        } else if let Some(fl) = fl {
-            Ok(fl.into())
+            to_str(ac)
+        } else if !dirs.is_empty() {
+            to_str(0)
         } else {
             Err(BlibError::NoDeviceFound)
         }
