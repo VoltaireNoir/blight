@@ -170,36 +170,37 @@ impl Device {
         Ok(current)
     }
     /// Writes to the brightness file containted in /sys/class/backlight/ dir of the respective detected device, which will result in change of brightness if successful and if the chosen device is the correct one.
+    /// # Errors
+    /// - [``BlibError::WriteNewVal``] - on write failure
     pub fn write_value(&self, value: u16) -> BlResult<()> {
-        fs::write(
-            format!("{}/brightness", self.device_dir),
-            format!("{value}"),
-        )
-        .map_err(|err| BlibError::WriteNewVal {
-            err,
-            dev: self.name.clone(),
+        fs::write(format!("{}/brightness", self.device_dir), value.to_string()).map_err(|err| {
+            BlibError::WriteNewVal {
+                err,
+                dev: self.name.clone(),
+            }
         })?;
 
         Ok(())
     }
-}
 
-/// Calculates the new value to be written to the brightness file based on the provided step-size (percentage) and direction,
-/// for the given current and max values of the detected GPU device.
-///
-/// This function is used internally in [change_bl] function to calculate the final change value based on the given percentage.
-#[must_use]
-pub fn calculate_change(current: u16, max: u16, step_size: u16, dir: &Direction) -> u16 {
-    let step: u16 = (max as f32 * (step_size as f32 / 100.0)) as u16;
-    let change: u16 = match dir {
-        Direction::Inc => current.saturating_add(step),
-        Direction::Dec => current.saturating_sub(step),
-    };
+    /// Calculates the new value to be written to the brightness file based on the provided step-size (percentage) and direction,
+    /// using the current and max values of the detected GPU device.
+    ///
+    /// For example, if the currecnt value is 10 and max is 100, and you want to increase it by 10% (step_size),
+    /// the method will return 20, which can be directly written to the device.
+    ///
+    pub fn calculate_change(&self, step_size: u16, dir: Direction) -> u16 {
+        let step: u16 = (self.max as f32 * (step_size as f32 / 100.0)) as u16;
+        let change: u16 = match dir {
+            Direction::Inc => self.current.saturating_add(step),
+            Direction::Dec => self.current.saturating_sub(step),
+        };
 
-    if change > max {
-        max
-    } else {
-        change
+        if change > self.max {
+            self.max
+        } else {
+            change
+        }
     }
 }
 
@@ -219,7 +220,7 @@ pub fn change_bl(
 ) -> Result<(), BlibError> {
     let device = Device::new(device_name)?;
 
-    let change = calculate_change(device.current, device.max, step_size, dir);
+    let change = device.calculate_change(step_size, dir);
     if change != device.current {
         match ch {
             Change::Sweep => sweep(&device, change, dir)?,
@@ -362,25 +363,49 @@ mod tests {
 
     #[test]
     fn inc_calculation() {
-        let ch = calculate_change(10, 100, 10, Direction::Inc);
+        let d = Device {
+            name: String::new(),
+            current: 10,
+            max: 100,
+            device_dir: String::new(),
+        };
+        let ch = d.calculate_change(10, Direction::Inc);
         assert_eq!(ch, 20);
     }
 
     #[test]
     fn dec_calculation() {
-        let ch = calculate_change(30, 100, 10, Direction::Dec);
+        let d = Device {
+            name: String::new(),
+            current: 30,
+            max: 100,
+            device_dir: String::new(),
+        };
+        let ch = d.calculate_change(10, Direction::Dec);
         assert_eq!(ch, 20);
     }
 
     #[test]
     fn inc_calculation_max() {
-        let ch = calculate_change(90, 100, 20, Direction::Inc);
+        let d = Device {
+            name: String::new(),
+            current: 90,
+            max: 100,
+            device_dir: String::new(),
+        };
+        let ch = d.calculate_change(20, Direction::Inc);
         assert_eq!(ch, 100);
     }
 
     #[test]
     fn dec_calculation_max() {
-        let ch = calculate_change(10, 100, 20, Direction::Dec);
+        let d = Device {
+            name: String::new(),
+            current: 10,
+            max: 100,
+            device_dir: String::new(),
+        };
+        let ch = d.calculate_change(20, Direction::Dec);
         assert_eq!(ch, 0);
     }
 
