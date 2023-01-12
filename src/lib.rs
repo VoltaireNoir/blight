@@ -219,10 +219,10 @@ pub fn change_bl(
 ) -> Result<(), BlibError> {
     let device = Device::new(device_name)?;
 
-    let change = calculate_change(device.current, device.max, step_size, &dir);
+    let change = calculate_change(device.current, device.max, step_size, dir);
     if change != device.current {
         match ch {
-            Change::Sweep => sweep(&device, change, &dir)?,
+            Change::Sweep => sweep(&device, change, dir)?,
             Change::Regular => device.write_value(change)?,
         }
     }
@@ -260,7 +260,7 @@ pub fn set_bl(val: u16, device_name: Option<Cow<str>>) -> Result<(), BlibError> 
 /// # Errors
 /// Possible errors that can result from this function include:
 /// * [``BlibError::WriteNewVal``]
-pub fn sweep(device: &Device, change: u16, dir: &Direction) -> Result<(), BlibError> {
+pub fn sweep(device: &Device, change: u16, dir: Direction) -> Result<(), BlibError> {
     match dir {
         Direction::Inc => {
             let mut val = device.current + 1;
@@ -362,25 +362,25 @@ mod tests {
 
     #[test]
     fn inc_calculation() {
-        let ch = calculate_change(10, 100, 10, &Direction::Inc);
+        let ch = calculate_change(10, 100, 10, Direction::Inc);
         assert_eq!(ch, 20);
     }
 
     #[test]
     fn dec_calculation() {
-        let ch = calculate_change(30, 100, 10, &Direction::Dec);
+        let ch = calculate_change(30, 100, 10, Direction::Dec);
         assert_eq!(ch, 20);
     }
 
     #[test]
     fn inc_calculation_max() {
-        let ch = calculate_change(90, 100, 20, &Direction::Inc);
+        let ch = calculate_change(90, 100, 20, Direction::Inc);
         assert_eq!(ch, 100);
     }
 
     #[test]
     fn dec_calculation_max() {
-        let ch = calculate_change(10, 100, 20, &Direction::Dec);
+        let ch = calculate_change(10, 100, 20, Direction::Dec);
         assert_eq!(ch, 0);
     }
 
