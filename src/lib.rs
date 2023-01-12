@@ -11,6 +11,23 @@
 //! > **IMPORTANT:** You need write permission for the file `/sys/class/backlight/{your_device}/brightness` to change brightness.
 //! > The CLI utility comes with a helper script that let's you gain access to the brightness file (which may not always work), which you can run by using the command `sudo blight setup`.
 //! > If you're only using blight as a dependency, you can read about gaining file permissions [here](https://wiki.archlinux.org/title/Backlight#ACPI).
+//!
+//! # Usage
+//! ```ignore
+//! use blight::{change_bl, set_bl, BlResult, Change, Device, Direction};
+//!
+//! fn main() -> BlResult<()> {
+//!     // Using the helper functions
+//!     change_bl(5, Change::Regular, Direction::Inc, None)?; // Increases brightness by 5%
+//!     set_bl(50, Some("nvidia_0".into()))?; // Sets brightness value (not percentage) to 50
+//!
+//!     // Doing it manually
+//!     let dev = Device::new(None)?;
+//!     let new = dev.calculate_change(5, Direction::Dec);
+//!     dev.write_value(new)?; // decreases brightness by 5%
+//!     Ok(())
+//! }
+//! ```
 
 use err::BlibError;
 use std::{borrow::Cow, fs, path::PathBuf, thread, time::Duration};
