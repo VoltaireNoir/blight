@@ -243,7 +243,7 @@ pub fn print_help() {
     let title = "blight: A backlight utility for Linux that plays well with hybrid GPUs";
     let quote = "\"And man said, \'let there b-light\' and there was light.\" - Some Book 1:3";
     let flags = "Flags: sweep [--sweep, -s], dev [--device <name>, -d <name>]
-    Sweep flag lets you increases brightness gradually, resulting in a smooth change.
+    Sweep flag lets you increase brightness gradually, resulting in a smooth change.
     Dev (short for device) flag lets you specify a backlight device target other than the default one.";
     let commands: String = [
         ("inc [val] [flags: dev, sweep]", "-> increase brightness"),
