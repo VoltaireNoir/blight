@@ -1,19 +1,33 @@
 # blight
-[![Rust](https://github.com/VoltaireNoir/blight/actions/workflows/rust.yml/badge.svg)](https://github.com/VoltaireNoir/blight/actions/workflows/rust.yml)
-[![Crates.io](https://img.shields.io/crates/v/blight)](https://crates.io/crates/blight)
-#### _A hassle-free CLI utility to manage backlight on Linux; one that plays well with hybrid GPU configuration and proprietary drivers._
-
-> "And man said, 'let there b-light' and there was light." - Some Book 1:3
+<div align="center">
 
 ![Generated using Dall-E 2](blightm.png)
 *(Credits: Sneha Sundar, for generating this lovely image for blight using DALL·E 2)*
-## Screenshots
-![](blight.png)
-![](blight2.png)
-## About
+
+[![Rust](https://github.com/VoltaireNoir/blight/actions/workflows/rust.yml/badge.svg)](https://github.com/VoltaireNoir/blight/actions/workflows/rust.yml)
+[![Crates.io](https://img.shields.io/crates/v/blight)](https://crates.io/crates/blight)
+[![Downloads](https://img.shields.io/crates/d/blight)](https://crates.io/crates/blight)
+![License](https://img.shields.io/crates/l/blight)
+
+</div>
+
+> "And man said, 'let there b-light' and there was light." - Some Book 1:3
+
+_A hassle-free CLI utility to manage backlight on Linux; one that plays well with hybrid GPU configuration and proprietary drivers._
+
+_However, the parts which blight relies on to make backlight changes, are also exposed through the library aspect of this crate, which can be used like any other Rust library by using the command `cargo add blight` in your Rust project. The CLI utility, on the other hand, can be installed by running `cargo install blight`._
+
+> **Note**
+> This page contains documentation for the CLI. For library docs, visit [docs.rs](https://docs.rs/blight/).
+
 > **Warning**
 > For this program to run without root privileges, the user needs to be in the video group and might need udev rules to allow write access to brightness files. Read more about it [here](https://wiki.archlinux.org/title/Backlight#ACPI). If you do not have write permissions, then you'd have to run the program with `sudo`.
 
+## Screenshots
+![](blight.png)
+![](blight2.png)
+
+## About
 A lot of Linux backlight utilities often fail to detect the right backlight device to control in laptops that ship with Intel or Amd iGPUs and an Nvidia dGPU with proprietary drivers. This utility aims to solve that problem by prioritizing integrated graphic devices, followed by dedicated Nvdia GPU and ACPI kernel module. This means that you do not have to manually specify which device is currently active whenever you switch between your iGPU and dGPU using the MUX switch. Other than that, *blight* also implements sweep-up and sweep-down option, which lets you change brightness in a smooth sweeping manner, rather than applying sudden jerky increments/decrements.
 
 In principle, blight should work on any GNU/Linux distro, and even on systems without hybrid GPU configuration. However, it has only been tested on Arch and Debian so far. Any feedback and bug reports will be greatly appreciated.
