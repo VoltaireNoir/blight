@@ -40,14 +40,12 @@ Set custom shortcuts using your distro settings or pair it with a hotkey daemon 
 - Display status `blight status` OR `blight status -d device_name`
 - Run first time setup script (for write permissions) `sudo blight setup`
 - List all backlight devices `blight list`
-- Increase brightness `blight inc 5` (increases by 5%, instead of default 2%)
+- Increase brightness `blight inc 5` (increase by 5%)
 - Decrease brightness `blight dec 10` (decrease by 10%)
 - Increase/decrease brightness smoothly `blight inc 10 -s` OR `blight dec 10 --sweep`
 - Set custom brightness value `blight set 50`
 - Increase brightness for specific device `blight inc 2 -d nvidia_0`
 - Save/restore brightness `blight save` OR `blight restore -d amdgpu_bl0`
-
-Note: When specifying a device name, you need to specify optional values too if the command accepts them (see above example).
 
 ## Install
 ### Using Cargo
