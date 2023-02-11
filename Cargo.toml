@@ -1,12 +1,12 @@
 [package]
 name = "blight"
-description = "A hassle-free CLI backlight utility for Linux; one that plays well with hybrid GPUs and proprietary drivers."
-categories = ["command-line-utilities"]
+description = "A hassle-free CLI backlight utility/library for Linux."
+categories = ["command-line-utilities","os::linux-apis"]
 keywords = ["backlight","CLI","utility","hybrid-gpu","brightness"]
 authors = ["Maaz Ahmed <mzahmed95@gmail.com>"]
 repository = "https://github.com/VoltaireNoir/blight"
 license = "MIT"
-version = "0.3.1"
+version = "0.4.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
