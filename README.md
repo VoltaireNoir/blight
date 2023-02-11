@@ -21,7 +21,7 @@ The parts which blight relies on to make backlight changes, are also exposed thr
 > This page contains documentation for the CLI. For library docs, visit [docs.rs](https://docs.rs/blight/).
 
 > **Warning**
-> For this program to run without root privileges, the user needs to be in the video group and might need udev rules to allow write access to brightness files. Read more about it [here](https://wiki.archlinux.org/title/Backlight#ACPI). If you do not have write permissions, then you'd have to run the program with `sudo`.
+> For this program to run without root privileges, the user needs to be in the video group and might need udev rules to allow write access to brightness files. Read more about it [here](https://wiki.archlinux.org/title/Backlight#ACPI). You can gain required permissions by using the helper script that comes with blight by running `sudo blight setup` once or you could do it manually too. If not, you'd have to run the program with `sudo` every time.
 
 ## Screenshots
 ![](blight_s1.png)
