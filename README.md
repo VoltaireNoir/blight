@@ -24,8 +24,8 @@ The parts which blight relies on to make backlight changes, are also exposed thr
 > For this program to run without root privileges, the user needs to be in the video group and might need udev rules to allow write access to brightness files. Read more about it [here](https://wiki.archlinux.org/title/Backlight#ACPI). If you do not have write permissions, then you'd have to run the program with `sudo`.
 
 ## Screenshots
-![](blight.png)
-![](blight2.png)
+![](blight_s1.png)
+![](blight_s2.png)
 
 ## About
 A lot of Linux backlight utilities often fail to detect the right backlight device to control in laptops that ship with Intel or Amd iGPUs and an Nvidia dGPU with proprietary drivers. This utility aims to solve that problem by prioritizing integrated graphic devices, followed by dedicated Nvdia GPU and ACPI kernel module. This means that you do not have to manually specify which device is currently active whenever you switch between your iGPU and dGPU using the MUX switch. Other than that, *blight* also implements the `sweep` functionality, which lets you change brightness in a smooth sweeping manner, rather than applying sudden jerky increments/decrements.
