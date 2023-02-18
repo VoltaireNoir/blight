@@ -16,21 +16,14 @@ pub enum BlibError {
 }
 
 #[doc(hidden)]
-pub trait Tip: Error + 'static
-where
-    Self: Sized,
-{
-    fn tip(self) -> (Self, Option<Cow<'static, str>>);
-    fn boxed_tip(self) -> (Box<dyn Error>, Option<Cow<'static, str>>) {
-        let (s, t) = self.tip();
-        (Box::new(s), t)
-    }
+pub trait Tip: Error + 'static {
+    fn tip(&self) -> Option<Cow<'static, str>>;
 }
 
 impl Tip for BlibError {
-    fn tip(self) -> (Self, Option<Cow<'static, str>>) {
+    fn tip(&self) -> Option<Cow<'static, str>> {
         use BlibError::WriteNewVal;
-        let tip: Option<Cow<str>> = match &self {
+        match &self {
             WriteNewVal { dev, .. } => {
                 let tip_msg = format!(
                     "{main} '{dir}/{dev}/brightness'\n{extra}",
@@ -44,8 +37,7 @@ if you'd like to do it manually.",
                 Some(tip_msg.into())
             }
             _ => None,
-        };
-        (self, tip)
+        }
     }
 }
 

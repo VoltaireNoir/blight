@@ -11,7 +11,7 @@ mod setup;
 
 const SAVEDIR: &str = "/.local/share/blight";
 
-type ErrnTip = (Box<dyn Error>, Option<Cow<'static, str>>);
+type DynError = Box<dyn Error + 'static>;
 
 pub struct Config<'a> {
     command: Command,
@@ -53,7 +53,7 @@ impl Options<'_> {
     }
 }
 
-pub fn parse<'a>(mut args: Skip<Args>) -> Result<Config<'a>, (BlightError, Option<Cow<'a, str>>)> {
+pub fn parse<'a>(mut args: Skip<Args>) -> Result<Config<'a>, DynError> {
     use BlightError::*;
     use Command::*;
 
@@ -74,9 +74,9 @@ pub fn parse<'a>(mut args: Skip<Args>) -> Result<Config<'a>, (BlightError, Optio
             "set" => {
                 let val: u16 = args
                     .next()
-                    .ok_or(MissingValue.tip())?
+                    .ok_or(MissingValue)?
                     .parse()
-                    .or(Err(InvalidValue.tip()))?;
+                    .or(Err(InvalidValue))?;
 
                 (Set(val), option_parser(args))
             }
@@ -84,15 +84,15 @@ pub fn parse<'a>(mut args: Skip<Args>) -> Result<Config<'a>, (BlightError, Optio
             ch @ ("inc" | "dec") => {
                 let value: u16 = args
                     .next()
-                    .ok_or(MissingValue.tip())?
+                    .ok_or(MissingValue)?
                     .parse()
-                    .or(Err(InvalidValue.tip()))?;
+                    .map_err(|_| InvalidValue)?;
 
                 let dir = if ch == "inc" { Inc } else { Dec };
 
                 (Adjust { dir, value }, option_parser(args))
             }
-            _ => return Err(UnrecognisedCommand.tip()),
+            _ => Err(UnrecognisedCommand)?,
         }
     } else {
         no_op(Command::ShortHelp)
@@ -103,7 +103,7 @@ pub fn parse<'a>(mut args: Skip<Args>) -> Result<Config<'a>, (BlightError, Optio
 
 type SuccessMessage = &'static str;
 
-pub fn execute(conf: Config) -> Result<SuccessMessage, ErrnTip> {
+pub fn execute(conf: Config) -> Result<SuccessMessage, DynError> {
     use Command::*;
 
     match conf.command {
@@ -111,13 +111,12 @@ pub fn execute(conf: Config) -> Result<SuccessMessage, ErrnTip> {
         ShortHelp => print_shelp(),
         List => print_devices(),
         Setup => setup::run(),
-        Status => print_status(conf.options.device).map_err(|e| e.boxed_tip())?,
+        Status => print_status(conf.options.device)?,
         Save => save(conf.options.device)?,
         Restore => restore()?,
-        Set(v) => blight::set_bl(v, conf.options.device).map_err(|e| e.boxed_tip())?,
+        Set(v) => blight::set_bl(v, conf.options.device)?,
         Adjust { dir, value } => {
-            blight::change_bl(value, conf.options.sweep, dir, conf.options.device)
-                .map_err(|e| e.boxed_tip())?
+            blight::change_bl(value, conf.options.sweep, dir, conf.options.device)?
         }
     };
 
@@ -137,9 +136,9 @@ pub enum BlightError {
 }
 
 impl Tip for BlightError {
-    fn tip(self) -> (Self, Option<Cow<'static, str>>) {
+    fn tip(&self) -> Option<Cow<'static, str>> {
         use BlightError::*;
-        let tip = match self {
+        match self {
             UnrecognisedCommand => Some("try 'blight help' to see all commands".into()),
             InvalidValue => Some("make sure the value is a valid positive integer".into()),
             NoSaveFound => Some("try using 'blight save' first".into()),
@@ -149,8 +148,7 @@ impl Tip for BlightError {
             ReadFromSave(_) => Some("make sure you have read permission for the save file".into()),
             SaveParseErr => Some("delete the save file and try save-restore again".into()),
             _ => None,
-        };
-        (self, tip)
+        }
     }
 }
 
@@ -172,9 +170,13 @@ impl std::fmt::Display for BlightError {
 
 impl Error for BlightError {}
 
-pub fn print_err(e: impl std::fmt::Display, t: Option<Cow<str>>) {
+pub fn print_err(e: DynError) {
     eprintln!("{} {e}", "Error".red().bold());
-    if let Some(tip) = t {
+    if let Some(tip) = e
+        .downcast_ref::<BlibError>()
+        .and_then(|e| e.tip())
+        .or(e.downcast_ref::<BlightError>().and_then(|e| e.tip()))
+    {
         eprintln!("{} {tip}", "Tip".yellow().bold())
     }
 }
@@ -306,36 +308,35 @@ pub fn print_shelp() {
     );
 }
 
-pub fn save(device_name: Option<Cow<str>>) -> Result<(), ErrnTip> {
-    let device = Device::new(device_name).map_err(|e| e.boxed_tip())?;
+pub fn save(device_name: Option<Cow<str>>) -> Result<(), DynError> {
+    let device = Device::new(device_name)?;
     let mut savedir = PathBuf::from(env::var("HOME").unwrap() + SAVEDIR);
 
     if !savedir.exists() && fs::create_dir_all(&savedir).is_err() {
-        return Err(BlightError::CreateSaveDir(savedir).boxed_tip());
+        return Err(BlightError::CreateSaveDir(savedir).into());
     }
 
     savedir.push("blight.save");
 
-    if fs::write(&savedir, format!("{} {}", device.name(), device.current())).is_err() {
-        Err(BlightError::WriteToSaveFile(savedir).boxed_tip())?;
-    }
+    fs::write(&savedir, format!("{} {}", device.name(), device.current()))
+        .map_err(|_| BlightError::WriteToSaveFile(savedir))?;
 
     Ok(())
 }
 
-pub fn restore() -> Result<(), ErrnTip> {
+pub fn restore() -> Result<(), DynError> {
     let save = PathBuf::from((env::var("HOME").unwrap() + SAVEDIR) + "/blight.save");
 
     let restore = if save.is_file() {
-        fs::read_to_string(save).map_err(|e| BlightError::ReadFromSave(e).boxed_tip())?
+        fs::read_to_string(save).map_err(BlightError::ReadFromSave)?
     } else {
-        Err(BlightError::NoSaveFound.boxed_tip())?
+        Err(BlightError::NoSaveFound)?
     };
 
     let (device_name, val) = restore.split_once(' ').unwrap();
-    let device = Device::new(Some(device_name.into())).map_err(|e| e.boxed_tip())?;
+    let device = Device::new(Some(device_name.into()))?;
 
-    let value: u16 = val.parse().or(Err(BlightError::SaveParseErr.boxed_tip()))?;
-    device.write_value(value).map_err(|e| e.boxed_tip())?;
+    let value: u16 = val.parse().map_err(|_| BlightError::SaveParseErr)?;
+    device.write_value(value)?;
     Ok(())
 }
