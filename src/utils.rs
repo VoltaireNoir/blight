@@ -255,17 +255,14 @@ pub fn print_help() {
             "save [flags: dev]",
             "-> save current brightness value to restore later",
         ),
-        (
-            "restore [flags: dev]",
-            "-> restore saved brightness value\n",
-        ),
+        ("restore", "-> restore saved brightness value\n"),
         (
             "setup",
             "-> installs udev rules and adds user to video group (run with sudo)",
         ),
         ("status [flags: dev]", "-> backlight device status"),
         ("list", "-> list all backlight devices"),
-        ("help", "-> displays help"),
+        ("help", "-> display help"),
     ]
     .into_iter()
     .map(|(c, e)| format!("{} {e}\n", c.green().bold()))

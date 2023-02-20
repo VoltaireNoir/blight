@@ -45,7 +45,8 @@ Set custom shortcuts using your distro settings or pair it with a hotkey daemon 
 - Increase/decrease brightness smoothly `blight inc 10 -s` OR `blight dec 10 --sweep`
 - Set custom brightness value `blight set 50`
 - Increase brightness for specific device `blight inc 2 -d nvidia_0`
-- Save/restore brightness `blight save` OR `blight restore -d amdgpu_bl0`
+- Save brightness `blight save` OR `blight save -d amdgpu_bl0`
+- Restore brightness `blight restore`
 
 ## Install
 ### Using Cargo
