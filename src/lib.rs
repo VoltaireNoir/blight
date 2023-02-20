@@ -273,34 +273,31 @@ pub fn set_bl(val: u16, device_name: Option<Cow<str>>) -> Result<(), BlibError> 
 
 /// This function takes a borrow of a Device instance, a [calculated change][calculate_change] value and the [Direction].
 ///
-/// It writes to the brightness file in an increment of 1 on each loop until change value is reached.
+/// It writes to the brightness file in an increment of 1% on each loop until change value is reached.
 /// Each loop has a delay of 25ms, to produce to a smooth sweeping effect when executed.
 /// # Errors
 /// Possible errors that can result from this function include:
 /// * [``BlibError::WriteNewVal``]
 pub fn sweep(device: &Device, change: u16, dir: Direction) -> Result<(), BlibError> {
-    match dir {
-        Direction::Inc => {
-            let mut val = device.current + 1;
-
-            while val <= change {
-                device.write_value(val)?;
-                thread::sleep(Duration::from_millis(25));
-                val += 1;
-            }
-        }
-        Direction::Dec => {
-            let mut val = device.current - 1;
-
-            while val >= change {
-                device.write_value(val)?;
-                thread::sleep(Duration::from_millis(25));
-                if val == 0 {
-                    break;
+    let mut rate = (f32::from(device.max) * 0.01) as u16;
+    let mut val = device.current;
+    while val != change {
+        match dir {
+            Direction::Inc => {
+                if (val + rate) > change {
+                    rate = change - val;
                 }
-                val -= 1;
+                val += rate;
+            }
+            Direction::Dec => {
+                if (val - rate) < change {
+                    rate = val - change;
+                }
+                val -= rate;
             }
         }
+        device.write_value(val)?;
+        thread::sleep(Duration::from_millis(25));
     }
     Ok(())
 }
