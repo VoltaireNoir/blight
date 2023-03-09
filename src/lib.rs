@@ -275,7 +275,12 @@ pub fn set_bl(val: u16, device_name: Option<Cow<str>>) -> Result<(), BlibError> 
 pub fn sweep(device: &Device, change: u16, dir: Direction) -> Result<(), BlibError> {
     let mut rate = (f32::from(device.max) * 0.01) as u16;
     let mut val = device.current;
-    while val != change {
+
+    while !(val == change
+        || change > device.max
+        || (val == 0 && dir == Direction::Dec)
+        || (val == device.max && dir == Direction::Inc))
+    {
         match dir {
             Direction::Inc => {
                 if (val + rate) > change {
@@ -284,7 +289,9 @@ pub fn sweep(device: &Device, change: u16, dir: Direction) -> Result<(), BlibErr
                 val += rate;
             }
             Direction::Dec => {
-                if (val - rate) < change {
+                if rate > val {
+                    rate = val;
+                } else if (val - rate) < change {
                     rate = val - change;
                 }
                 val -= rate;
