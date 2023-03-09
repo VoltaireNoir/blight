@@ -193,10 +193,11 @@ impl Device {
         Ok(())
     }
 
-    /// This function takes a borrow of a Device instance, a [calculated change][calculate_change] value and the [Direction].
-    ///
-    /// It writes to the brightness file in an increment of 1% on each loop until change value is reached.
+    /// Writes to the brightness file in an increment of 1% on each loop until change value is reached.
     /// Each loop has a delay of 25ms, to produce to a smooth sweeping effect when executed.
+    ///
+    /// This method takes a target value, which can be computed with the help of [``Device::calculate_change``] or can also be manually entered.
+    /// Nothing is written to the brightness file if the provided value is the same as current brightness value or is larger than the max brightness value.
     /// # Errors
     /// Possible errors that can result from this function include:
     /// * [``BlibError::WriteNewVal``]
