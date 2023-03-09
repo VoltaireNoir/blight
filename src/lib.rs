@@ -155,17 +155,11 @@ impl Device {
         }
     }
 
-    /// Reloads max and current values for the current device in place.
+    /// Reloads current value for the current device in place.
     /// # Panics
-    /// The method panics if either max or current values fail to be read from the filesystem.
+    /// The method panics if the current value fails to be read from the filesystem.
     pub fn reload(&mut self) {
-        let dd = &self.device_dir;
-        *self = Device {
-            max: Device::get_max(dd).unwrap(),
-            current: Device::get_current(dd).unwrap(),
-            name: std::mem::take(&mut self.name),
-            device_dir: std::mem::take(&mut self.device_dir),
-        };
+        self.current = Device::get_current(&self.device_dir).unwrap();
     }
 
     fn get_max(device_dir: &str) -> BlResult<u16> {
