@@ -193,6 +193,49 @@ impl Device {
         Ok(())
     }
 
+    /// This function takes a borrow of a Device instance, a [calculated change][calculate_change] value and the [Direction].
+    ///
+    /// It writes to the brightness file in an increment of 1% on each loop until change value is reached.
+    /// Each loop has a delay of 25ms, to produce to a smooth sweeping effect when executed.
+    /// # Errors
+    /// Possible errors that can result from this function include:
+    /// * [``BlibError::WriteNewVal``]
+    pub fn sweep_write(&self, value: u16) -> Result<(), BlibError> {
+        let mut rate = (f32::from(self.max) * 0.01) as u16;
+        let mut current = self.current;
+        let dir = if value > self.current {
+            Direction::Inc
+        } else {
+            Direction::Dec
+        };
+
+        while !(current == value
+            || value > self.max
+            || (current == 0 && dir == Direction::Dec)
+            || (current == self.max && dir == Direction::Inc))
+        {
+            match dir {
+                Direction::Inc => {
+                    if (current + rate) > value {
+                        rate = value - current;
+                    }
+                    current += rate;
+                }
+                Direction::Dec => {
+                    if rate > current {
+                        rate = current;
+                    } else if (current - rate) < value {
+                        rate = current - value;
+                    }
+                    current -= rate;
+                }
+            }
+            self.write_value(current)?;
+            thread::sleep(Duration::from_millis(25));
+        }
+        Ok(())
+    }
+
     /// Calculates the new value to be written to the brightness file based on the provided step-size (percentage) and direction,
     /// using the current and max values of the detected GPU device.
     ///
@@ -234,7 +277,7 @@ pub fn change_bl(
     let change = device.calculate_change(step_size, dir);
     if change != device.current {
         match ch {
-            Change::Sweep => sweep(&device, change, dir)?,
+            Change::Sweep => device.sweep_write(change)?,
             Change::Regular => device.write_value(change)?,
         }
     }
@@ -261,44 +304,6 @@ pub fn set_bl(val: u16, device_name: Option<Cow<str>>) -> Result<(), BlibError> 
 
     if val <= device.max && val != device.current {
         device.write_value(val)?;
-    }
-    Ok(())
-}
-
-/// This function takes a borrow of a Device instance, a [calculated change][calculate_change] value and the [Direction].
-///
-/// It writes to the brightness file in an increment of 1% on each loop until change value is reached.
-/// Each loop has a delay of 25ms, to produce to a smooth sweeping effect when executed.
-/// # Errors
-/// Possible errors that can result from this function include:
-/// * [``BlibError::WriteNewVal``]
-pub fn sweep(device: &Device, change: u16, dir: Direction) -> Result<(), BlibError> {
-    let mut rate = (f32::from(device.max) * 0.01) as u16;
-    let mut val = device.current;
-
-    while !(val == change
-        || change > device.max
-        || (val == 0 && dir == Direction::Dec)
-        || (val == device.max && dir == Direction::Inc))
-    {
-        match dir {
-            Direction::Inc => {
-                if (val + rate) > change {
-                    rate = change - val;
-                }
-                val += rate;
-            }
-            Direction::Dec => {
-                if rate > val {
-                    rate = val;
-                } else if (val - rate) < change {
-                    rate = val - change;
-                }
-                val -= rate;
-            }
-        }
-        device.write_value(val)?;
-        thread::sleep(Duration::from_millis(25));
     }
     Ok(())
 }
