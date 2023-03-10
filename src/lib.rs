@@ -430,6 +430,32 @@ mod tests {
         assert_eq!(ch, 0);
     }
 
+    #[test]
+    fn sweeping() {
+        clean_up();
+        setup_test_env(&["generic"]).unwrap();
+        let mut d = test_device("generic");
+        d.sweep_write(100).unwrap();
+        d.reload();
+        assert_eq!(d.current, 100);
+        d.sweep_write(0).unwrap();
+        d.reload();
+        assert_eq!(d.current, 0);
+        clean_up();
+    }
+
+    #[test]
+    fn sweep_bounds() {
+        clean_up();
+        setup_test_env(&["generic"]).unwrap();
+        let mut d = test_device("generic");
+        d.write_value(0).unwrap();
+        d.sweep_write(u16::MAX).unwrap();
+        d.reload();
+        assert_eq!(d.current, 0);
+        clean_up();
+    }
+
     fn setup_test_env(dirs: &[&str]) -> Result<(), Box<dyn Error>> {
         fs::create_dir(TESTDIR)?;
         for dir in dirs {
@@ -438,6 +464,15 @@ mod tests {
             fs::write(format!("{TESTDIR}/{dir}/max"), "100")?;
         }
         Ok(())
+    }
+
+    fn test_device(name: &str) -> Device {
+        Device {
+            name: name.into(),
+            current: 50,
+            max: 100,
+            device_dir: format!("{TESTDIR}/{name}"),
+        }
     }
 
     fn clean_up() {
