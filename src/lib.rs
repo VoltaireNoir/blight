@@ -237,13 +237,11 @@ impl Device {
     /// # Errors
     /// - [``BlibError::WriteNewVal``] - on write failure
     pub fn write_value(&self, value: u16) -> BlResult<()> {
-        fs::write(format!("{}/brightness", self.device_dir), value.to_string()).map_err(|err| {
-            BlibError::WriteNewVal {
-                err,
-                dev: self.name.clone(),
-            }
-        })?;
-
+        let convert = |err| BlibError::WriteNewVal {
+            err,
+            dev: self.name.clone(),
+        };
+        write!(self.open_bl_file().map_err(convert)?, "{value}").map_err(convert)?;
         Ok(())
     }
 
