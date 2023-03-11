@@ -13,7 +13,7 @@
 //! > If you're only using blight as a dependency, you can read about gaining file permissions [here](https://wiki.archlinux.org/title/Backlight#ACPI).
 //!
 //! # Usage
-//! ```
+//! ```ignore
 //! use blight::{BlResult, Change, Device, Direction, Delay};
 //!
 //! fn main() -> BlResult<()> {
