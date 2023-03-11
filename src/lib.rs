@@ -30,7 +30,13 @@
 //! ```
 
 use err::BlibError;
-use std::{borrow::Cow, fs, path::PathBuf, thread, time::Duration};
+use std::{
+    borrow::Cow,
+    fs,
+    path::{Path, PathBuf},
+    thread,
+    time::Duration,
+};
 
 pub mod err;
 pub use err::BlResult;
@@ -121,6 +127,10 @@ impl Device {
             device_dir,
             name: name.into(),
         })
+    }
+
+    pub fn device_path(&self) -> &Path {
+        self.device_dir.as_ref()
     }
 
     fn detect_device(bldir: &str) -> BlResult<String> {
