@@ -14,23 +14,34 @@
 //!
 //! # Usage
 //! ```ignore
-//! use blight::{change_bl, set_bl, BlResult, Change, Device, Direction};
+//! use blight::{BlResult, Change, Device, Direction, Delay};
 //!
 //! fn main() -> BlResult<()> {
 //!     // Using the helper functions
-//!     change_bl(5, Change::Regular, Direction::Inc, None)?; // Increases brightness by 5%
-//!     set_bl(50, Some("nvidia_0".into()))?; // Sets brightness value (not percentage) to 50
+//!     blight::change_bl(5, Change::Regular, Direction::Inc, None)?; // Increases brightness by 5%
+//!     blight::set_bl(50, Some("nvidia_0".into()))?; // Sets brightness value (not percentage) to 50
 //!
 //!     // Doing it manually
-//!     let dev = Device::new(None)?;
-//!     let new = dev.calculate_change(5, Direction::Dec);
+//!     let mut dev = Device::new(None)?;
+//!     let new = dev.calculate_change(5, Direction::Dec); // specify percentage and direction of change
 //!     dev.write_value(new)?; // decreases brightness by 5%
+//!     dev.reload(); // reloads current brightness value (important)
+//!     let new = dev.calculate_change(5, Direction::Inc);
+//!     dev.sweep_write(new, Delay::default()); // smoothly increases brightness by 5%
 //!     Ok(())
 //! }
 //! ```
 
 use err::BlibError;
-use std::{borrow::Cow, fs, path::PathBuf, thread, time::Duration};
+use std::{
+    borrow::Cow,
+    fs::{self, File},
+    io::prelude::*,
+    ops::Deref,
+    path::{Path, PathBuf},
+    thread,
+    time::Duration,
+};
 
 pub mod err;
 pub use err::BlResult;
@@ -38,7 +49,7 @@ pub use err::BlResult;
 /// Linux backlight directory location. All backlight hardware devices appear here.
 pub const BLDIR: &str = "/sys/class/backlight";
 
-/// This enum is used to specify the direction in which the backlight should be changed in the [change_bl] and [sweep] functions.
+/// This enum is used to specify the direction in which the backlight should be changed in the [``change_bl``] and [``Device::calculate_change``] functions.
 /// Inc -> Increase, Dec -> Decrease.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Direction {
@@ -46,7 +57,7 @@ pub enum Direction {
     Dec,
 }
 
-/// This enum is used to specify the kind of backlight change to carry out while calling the [change_bl] function. \
+/// This enum is used to specify the kind of backlight change to carry out while calling the [``change_bl``] function. \
 ///
 /// Regular change applies the calculated change directly, whereas the sweep change occurs in incremental steps.
 #[derive(Default, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -54,6 +65,39 @@ pub enum Change {
     #[default]
     Regular,
     Sweep,
+}
+
+/// A wrapper type for [``std::time::Duration``] used for specifying delay between each iteration of the loop in [``Device::sweep_write``].
+///
+/// Delay implements the Default trait, which always returns a Delay of 25ms (recommended delay for smooth brightness transisions).
+/// The struct also provides the [``from_millis``][Delay::from_millis] constructor, if you'd like to set your own duration in milliseconds.
+/// If you'd like to set the delay duration using units other than milliseconds, then you can use the From trait to create Delay using [Duration][std::time::Duration].
+#[derive(Debug, Clone, Copy)]
+pub struct Delay(Duration);
+
+impl From<Duration> for Delay {
+    fn from(value: Duration) -> Self {
+        Self(value)
+    }
+}
+
+impl Deref for Delay {
+    type Target = Duration;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl Default for Delay {
+    fn default() -> Self {
+        Self(Duration::from_millis(25))
+    }
+}
+
+impl Delay {
+    pub fn from_millis(millis: u64) -> Self {
+        Self(Duration::from_millis(millis))
+    }
 }
 
 /// An abstraction of a backlight device containing a name, current and max backlight values, and some related functionality.
@@ -123,6 +167,10 @@ impl Device {
         })
     }
 
+    pub fn device_path(&self) -> &Path {
+        self.device_dir.as_ref()
+    }
+
     fn detect_device(bldir: &str) -> BlResult<String> {
         let dirs: Vec<_> = fs::read_dir(bldir)
             .map_err(BlibError::ReadBlDir)?
@@ -153,6 +201,12 @@ impl Device {
         } else {
             Err(BlibError::NoDeviceFound)
         }
+    }
+
+    fn open_bl_file(&self) -> Result<File, std::io::Error> {
+        let mut path = self.device_path().to_path_buf();
+        path.push("brightness");
+        fs::File::options().write(true).open(path)
     }
 
     /// Reloads current value for the current device in place.
@@ -193,6 +247,60 @@ impl Device {
         Ok(())
     }
 
+    /// Writes to the brightness file starting from the current value in a loop, increasing 1% on each iteration with some delay until target value is reached,
+    /// creating a smooth brightness transition.
+    ///
+    /// This method takes a target value, which can be computed with the help of [``Device::calculate_change``] or can also be manually entered.
+    /// The delay between each iteration of the loop can be set using the [``Delay``] type, or the default can be used by calling [``Delay::default()``],
+    /// which sets the delay of 25ms/iter (recommended).
+    ///
+    /// Note: Nothing is written to the brightness file if the provided value is the same as current brightness value or is larger than the max brightness value.
+    /// # Example
+    /// ```ignore
+    /// Device::new(None)?
+    ///     .sweep_write(50, Delay::default())?;
+    /// ```
+    /// # Errors
+    /// Possible errors that can result from this function include:
+    /// * [``BlibError::SweepError``]
+    pub fn sweep_write(&self, value: u16, delay: Delay) -> Result<(), BlibError> {
+        let mut bfile = self.open_bl_file().map_err(BlibError::SweepError)?;
+        let mut rate = (f32::from(self.max) * 0.01) as u16;
+        let mut current = self.current;
+        let dir = if value > self.current {
+            Direction::Inc
+        } else {
+            Direction::Dec
+        };
+
+        while !(current == value
+            || value > self.max
+            || (current == 0 && dir == Direction::Dec)
+            || (current == self.max && dir == Direction::Inc))
+        {
+            match dir {
+                Direction::Inc => {
+                    if (current + rate) > value {
+                        rate = value - current;
+                    }
+                    current += rate;
+                }
+                Direction::Dec => {
+                    if rate > current {
+                        rate = current;
+                    } else if (current - rate) < value {
+                        rate = current - value;
+                    }
+                    current -= rate;
+                }
+            }
+            bfile.rewind().map_err(BlibError::SweepError)?;
+            write!(bfile, "{current}").map_err(BlibError::SweepError)?;
+            thread::sleep(*delay);
+        }
+        Ok(())
+    }
+
     /// Calculates the new value to be written to the brightness file based on the provided step-size (percentage) and direction,
     /// using the current and max values of the detected GPU device.
     ///
@@ -217,7 +325,7 @@ impl Device {
 /// A helper function to change backlight based on step-size (percentage), [Change] type and [Direction].
 ///
 /// Regular change uses [calculated change][Device::calculate_change] value based on step size and is applied instantly.
-/// Sweep change on the other hand, occurs gradually, producing a fade or sweeping effect. (For more info, read about [sweep])
+/// Sweep change on the other hand, occurs gradually, producing a fade or sweeping effect. (For more info, read about [``Device::sweep_write``])
 /// > Note: No change is applied if the final calculated value is the same as current brightness value
 /// # Errors
 /// Possible errors that can result from this function include:
@@ -234,7 +342,7 @@ pub fn change_bl(
     let change = device.calculate_change(step_size, dir);
     if change != device.current {
         match ch {
-            Change::Sweep => sweep(&device, change, dir)?,
+            Change::Sweep => device.sweep_write(change, Delay::default())?,
             Change::Regular => device.write_value(change)?,
         }
     }
@@ -261,37 +369,6 @@ pub fn set_bl(val: u16, device_name: Option<Cow<str>>) -> Result<(), BlibError> 
 
     if val <= device.max && val != device.current {
         device.write_value(val)?;
-    }
-    Ok(())
-}
-
-/// This function takes a borrow of a Device instance, a [calculated change][calculate_change] value and the [Direction].
-///
-/// It writes to the brightness file in an increment of 1% on each loop until change value is reached.
-/// Each loop has a delay of 25ms, to produce to a smooth sweeping effect when executed.
-/// # Errors
-/// Possible errors that can result from this function include:
-/// * [``BlibError::WriteNewVal``]
-pub fn sweep(device: &Device, change: u16, dir: Direction) -> Result<(), BlibError> {
-    let mut rate = (f32::from(device.max) * 0.01) as u16;
-    let mut val = device.current;
-    while val != change {
-        match dir {
-            Direction::Inc => {
-                if (val + rate) > change {
-                    rate = change - val;
-                }
-                val += rate;
-            }
-            Direction::Dec => {
-                if (val - rate) < change {
-                    rate = val - change;
-                }
-                val -= rate;
-            }
-        }
-        device.write_value(val)?;
-        thread::sleep(Duration::from_millis(25));
     }
     Ok(())
 }
@@ -417,6 +494,32 @@ mod tests {
         assert_eq!(ch, 0);
     }
 
+    #[test]
+    fn sweeping() {
+        clean_up();
+        setup_test_env(&["generic"]).unwrap();
+        let mut d = test_device("generic");
+        d.sweep_write(100, Delay::default()).unwrap();
+        d.reload();
+        assert_eq!(d.current, 100);
+        d.sweep_write(0, Delay::default()).unwrap();
+        d.reload();
+        assert_eq!(d.current, 0);
+        clean_up();
+    }
+
+    #[test]
+    fn sweep_bounds() {
+        clean_up();
+        setup_test_env(&["generic"]).unwrap();
+        let mut d = test_device("generic");
+        d.write_value(0).unwrap();
+        d.sweep_write(u16::MAX, Delay::default()).unwrap();
+        d.reload();
+        assert_eq!(d.current, 0);
+        clean_up();
+    }
+
     fn setup_test_env(dirs: &[&str]) -> Result<(), Box<dyn Error>> {
         fs::create_dir(TESTDIR)?;
         for dir in dirs {
@@ -425,6 +528,15 @@ mod tests {
             fs::write(format!("{TESTDIR}/{dir}/max"), "100")?;
         }
         Ok(())
+    }
+
+    fn test_device(name: &str) -> Device {
+        Device {
+            name: name.into(),
+            current: 50,
+            max: 100,
+            device_dir: format!("{TESTDIR}/{name}"),
+        }
     }
 
     fn clean_up() {
