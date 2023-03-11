@@ -219,6 +219,7 @@ impl Device {
     /// Possible errors that can result from this function include:
     /// * [``BlibError::WriteNewVal``]
     pub fn sweep_write(&self, value: u16) -> Result<(), BlibError> {
+        let mut bfile = self.open_bl_file().map_err(BlibError::SweepError)?;
         let mut rate = (f32::from(self.max) * 0.01) as u16;
         let mut current = self.current;
         let dir = if value > self.current {
@@ -248,7 +249,8 @@ impl Device {
                     current -= rate;
                 }
             }
-            self.write_value(current)?;
+            bfile.rewind().map_err(BlibError::SweepError)?;
+            write!(bfile, "{current}").map_err(BlibError::SweepError)?;
             thread::sleep(Duration::from_millis(25));
         }
         Ok(())
