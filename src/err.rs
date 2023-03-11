@@ -13,6 +13,7 @@ pub enum BlibError {
     WriteNewVal { err: std::io::Error, dev: String },
     ReadMax,
     ReadCurrent,
+    SweepError(std::io::Error),
 }
 
 #[doc(hidden)]
@@ -56,6 +57,8 @@ impl std::fmt::Display for BlibError {
             ReadCurrent => write!(f, "Failed to read current brightness value"),
 
             ReadMax => write!(f, "Failed to read max brightness value"),
+
+            SweepError(err) => write!(f, "Failed to sweep write to brightness file ({err})"),
         }
     }
 }
