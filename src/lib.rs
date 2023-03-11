@@ -244,14 +244,17 @@ impl Device {
         Ok(())
     }
 
-    /// Writes to the brightness file in an increment of 1% on each loop until change value is reached.
-    /// Each loop has a delay of 25ms, to produce to a smooth sweeping effect when executed.
+    /// Writes to the brightness file starting from the current value in a loop, increasing 1% on each iteration with some delay until target value is reached,
+    /// creating a smooth brightness transition.
     ///
     /// This method takes a target value, which can be computed with the help of [``Device::calculate_change``] or can also be manually entered.
-    /// Nothing is written to the brightness file if the provided value is the same as current brightness value or is larger than the max brightness value.
+    /// The delay between each iteration of the loop can be set using the [``Delay``] type, or the default can be used by calling [``Delay::default()``],
+    /// which sets the delay of 25ms/iter (recommended).
+    ///
+    /// Note: Nothing is written to the brightness file if the provided value is the same as current brightness value or is larger than the max brightness value.
     /// # Errors
     /// Possible errors that can result from this function include:
-    /// * [``BlibError::WriteNewVal``]
+    /// * [``BlibError::SweepError``]
     pub fn sweep_write(&self, value: u16, delay: Delay) -> Result<(), BlibError> {
         let mut bfile = self.open_bl_file().map_err(BlibError::SweepError)?;
         let mut rate = (f32::from(self.max) * 0.01) as u16;
