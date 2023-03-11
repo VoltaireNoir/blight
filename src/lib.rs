@@ -252,7 +252,7 @@ impl Device {
     /// # Errors
     /// Possible errors that can result from this function include:
     /// * [``BlibError::WriteNewVal``]
-    pub fn sweep_write(&self, value: u16) -> Result<(), BlibError> {
+    pub fn sweep_write(&self, value: u16, delay: Delay) -> Result<(), BlibError> {
         let mut bfile = self.open_bl_file().map_err(BlibError::SweepError)?;
         let mut rate = (f32::from(self.max) * 0.01) as u16;
         let mut current = self.current;
@@ -285,7 +285,7 @@ impl Device {
             }
             bfile.rewind().map_err(BlibError::SweepError)?;
             write!(bfile, "{current}").map_err(BlibError::SweepError)?;
-            thread::sleep(Duration::from_millis(25));
+            thread::sleep(*delay);
         }
         Ok(())
     }
@@ -331,7 +331,7 @@ pub fn change_bl(
     let change = device.calculate_change(step_size, dir);
     if change != device.current {
         match ch {
-            Change::Sweep => device.sweep_write(change)?,
+            Change::Sweep => device.sweep_write(change, Delay::default())?,
             Change::Regular => device.write_value(change)?,
         }
     }
@@ -488,10 +488,10 @@ mod tests {
         clean_up();
         setup_test_env(&["generic"]).unwrap();
         let mut d = test_device("generic");
-        d.sweep_write(100).unwrap();
+        d.sweep_write(100, Delay::default()).unwrap();
         d.reload();
         assert_eq!(d.current, 100);
-        d.sweep_write(0).unwrap();
+        d.sweep_write(0, Delay::default()).unwrap();
         d.reload();
         assert_eq!(d.current, 0);
         clean_up();
@@ -503,7 +503,7 @@ mod tests {
         setup_test_env(&["generic"]).unwrap();
         let mut d = test_device("generic");
         d.write_value(0).unwrap();
-        d.sweep_write(u16::MAX).unwrap();
+        d.sweep_write(u16::MAX, Delay::default()).unwrap();
         d.reload();
         assert_eq!(d.current, 0);
         clean_up();
