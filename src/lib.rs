@@ -34,6 +34,7 @@ use std::{
     borrow::Cow,
     fs::{self, File},
     io::prelude::*,
+    ops::Deref,
     path::{Path, PathBuf},
     thread,
     time::Duration,
@@ -61,6 +62,39 @@ pub enum Change {
     #[default]
     Regular,
     Sweep,
+}
+
+/// A wrapper type for [``std::time::Duration``] used for specifying delay between each iteration of the loop in [``Device::sweep_write``].
+///
+/// Delay implements the Default trait, which always returns a Delay of 25ms (recommended delay for smooth brightness transisions).
+/// The struct also provides the [``from_millis``] constructor, if you'd like to set your own duration in milliseconds.
+/// If you'd like to set the delay duration using units other than milliseconds, then you can use the From trait to create Delay using [Duration][std::time::Duration].
+#[derive(Debug, Clone, Copy)]
+pub struct Delay(Duration);
+
+impl From<Duration> for Delay {
+    fn from(value: Duration) -> Self {
+        Self(value)
+    }
+}
+
+impl Deref for Delay {
+    type Target = Duration;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl Default for Delay {
+    fn default() -> Self {
+        Self(Duration::from_millis(25))
+    }
+}
+
+impl Delay {
+    pub fn from_millis(millis: u64) -> Self {
+        Self(Duration::from_millis(millis))
+    }
 }
 
 /// An abstraction of a backlight device containing a name, current and max backlight values, and some related functionality.
