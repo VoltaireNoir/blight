@@ -23,7 +23,7 @@
 //!
 //!     // Doing it manually
 //!     let mut dev = Device::new(None)?;
-//!     let new = dev.calculate_change(5, Direction::Dec); // specify percentage and direction of change
+//!     let new = dev.calculate_change(5, Direction::Dec); // safely calculate value to write
 //!     dev.write_value(new)?; // decreases brightness by 5%
 //!     dev.reload(); // reloads current brightness value (important)
 //!     let new = dev.calculate_change(5, Direction::Inc);
@@ -300,7 +300,7 @@ impl Device {
     }
 
     /// Calculates the new value to be written to the brightness file based on the provided step-size (percentage) and direction,
-    /// using the current and max values of the detected GPU device.
+    /// using the current and max values of the detected GPU device. (Always guaranteed to be valid)
     ///
     /// For example, if the currecnt value is 10 and max is 100, and you want to increase it by 10% (step_size),
     /// the method will return 20, which can be directly written to the device.
