@@ -32,7 +32,8 @@
 use err::BlibError;
 use std::{
     borrow::Cow,
-    fs,
+    fs::{self, File},
+    io::prelude::*,
     path::{Path, PathBuf},
     thread,
     time::Duration,
@@ -163,6 +164,12 @@ impl Device {
         } else {
             Err(BlibError::NoDeviceFound)
         }
+    }
+
+    fn open_bl_file(&self) -> Result<File, std::io::Error> {
+        let mut path = self.device_path().to_path_buf();
+        path.push("brightness");
+        fs::File::options().write(true).open(path)
     }
 
     /// Reloads current value for the current device in place.
