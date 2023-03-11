@@ -13,18 +13,21 @@
 //! > If you're only using blight as a dependency, you can read about gaining file permissions [here](https://wiki.archlinux.org/title/Backlight#ACPI).
 //!
 //! # Usage
-//! ```ignore
-//! use blight::{change_bl, set_bl, BlResult, Change, Device, Direction};
+//! ```
+//! use blight::{BlResult, Change, Device, Direction, Delay};
 //!
 //! fn main() -> BlResult<()> {
 //!     // Using the helper functions
-//!     change_bl(5, Change::Regular, Direction::Inc, None)?; // Increases brightness by 5%
-//!     set_bl(50, Some("nvidia_0".into()))?; // Sets brightness value (not percentage) to 50
+//!     blight::change_bl(5, Change::Regular, Direction::Inc, None)?; // Increases brightness by 5%
+//!     blight::set_bl(50, Some("nvidia_0".into()))?; // Sets brightness value (not percentage) to 50
 //!
 //!     // Doing it manually
-//!     let dev = Device::new(None)?;
-//!     let new = dev.calculate_change(5, Direction::Dec);
+//!     let mut dev = Device::new(None)?;
+//!     let new = dev.calculate_change(5, Direction::Dec); // specify percentage and direction of change
 //!     dev.write_value(new)?; // decreases brightness by 5%
+//!     dev.reload(); // reloads current brightness value (important)
+//!     let new = dev.calculate_change(5, Direction::Inc);
+//!     dev.sweep_write(new, Delay::default()); // smoothly increases brightness by 5%
 //!     Ok(())
 //! }
 //! ```
@@ -46,7 +49,7 @@ pub use err::BlResult;
 /// Linux backlight directory location. All backlight hardware devices appear here.
 pub const BLDIR: &str = "/sys/class/backlight";
 
-/// This enum is used to specify the direction in which the backlight should be changed in the [change_bl] and [sweep] functions.
+/// This enum is used to specify the direction in which the backlight should be changed in the [``change_bl``] and [``Device::calculate_change``] functions.
 /// Inc -> Increase, Dec -> Decrease.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Direction {
@@ -54,7 +57,7 @@ pub enum Direction {
     Dec,
 }
 
-/// This enum is used to specify the kind of backlight change to carry out while calling the [change_bl] function. \
+/// This enum is used to specify the kind of backlight change to carry out while calling the [``change_bl``] function. \
 ///
 /// Regular change applies the calculated change directly, whereas the sweep change occurs in incremental steps.
 #[derive(Default, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -67,7 +70,7 @@ pub enum Change {
 /// A wrapper type for [``std::time::Duration``] used for specifying delay between each iteration of the loop in [``Device::sweep_write``].
 ///
 /// Delay implements the Default trait, which always returns a Delay of 25ms (recommended delay for smooth brightness transisions).
-/// The struct also provides the [``from_millis``] constructor, if you'd like to set your own duration in milliseconds.
+/// The struct also provides the [``from_millis``][Delay::from_millis] constructor, if you'd like to set your own duration in milliseconds.
 /// If you'd like to set the delay duration using units other than milliseconds, then you can use the From trait to create Delay using [Duration][std::time::Duration].
 #[derive(Debug, Clone, Copy)]
 pub struct Delay(Duration);
@@ -252,6 +255,11 @@ impl Device {
     /// which sets the delay of 25ms/iter (recommended).
     ///
     /// Note: Nothing is written to the brightness file if the provided value is the same as current brightness value or is larger than the max brightness value.
+    /// # Example
+    /// ```ignore
+    /// Device::new(None)?
+    ///     .sweep_write(50, Delay::default())?;
+    /// ```
     /// # Errors
     /// Possible errors that can result from this function include:
     /// * [``BlibError::SweepError``]
@@ -317,7 +325,7 @@ impl Device {
 /// A helper function to change backlight based on step-size (percentage), [Change] type and [Direction].
 ///
 /// Regular change uses [calculated change][Device::calculate_change] value based on step size and is applied instantly.
-/// Sweep change on the other hand, occurs gradually, producing a fade or sweeping effect. (For more info, read about [sweep])
+/// Sweep change on the other hand, occurs gradually, producing a fade or sweeping effect. (For more info, read about [``Device::sweep_write``])
 /// > Note: No change is applied if the final calculated value is the same as current brightness value
 /// # Errors
 /// Possible errors that can result from this function include:
