@@ -368,6 +368,7 @@ pub fn change_bl(
 /// Possible errors that can result from this function include:
 /// * All errors that can result from [``Device::new``]
 /// * [``BlibError::WriteNewVal``]
+/// * [``BlibError::ValueTooLarge``]
 pub fn set_bl(val: u16, device_name: Option<Cow<str>>) -> Result<(), BlibError> {
     let device = Device::new(device_name)?;
 
