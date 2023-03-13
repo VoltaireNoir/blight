@@ -29,11 +29,11 @@ impl Tip for BlibError {
             WriteNewVal { dev, .. } => {
                 let tip_msg = format!(
                     "{main} '{dir}/{dev}/brightness'\n{extra}",
-                    main = "Make sure you have write permission to the file",
+                    main = "make sure you have write permission to the file",
                     dir = super::BLDIR,
                     extra = "
 Run `sudo blight setup` to install necessarry udev rules and add user to video group.
-Or visit https://wiki.archlinux.org/title/Backlight#Hardware_interfaces
+or visit https://wiki.archlinux.org/title/Backlight#Hardware_interfaces
 if you'd like to do it manually.",
                 );
                 Some(tip_msg.into())
@@ -47,23 +47,23 @@ impl std::fmt::Display for BlibError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use BlibError::*;
         match self {
-            ReadBlDir(e) => write!(f, "Failed to read {} directory\n{e}", super::BLDIR),
+            ReadBlDir(e) => write!(f, "failed to read {} directory\n{e}", super::BLDIR),
 
-            NoDeviceFound => write!(f, "No known backlight device detected"),
+            NoDeviceFound => write!(f, "no known backlight device detected"),
 
             WriteNewVal { err, .. } => {
-                write!(f, "Failed to write to the brightness file ({err})",)
+                write!(f, "failed to write to the brightness file ({err})",)
             }
 
-            ReadCurrent => write!(f, "Failed to read current brightness value"),
+            ReadCurrent => write!(f, "failed to read current brightness value"),
 
-            ReadMax => write!(f, "Failed to read max brightness value"),
+            ReadMax => write!(f, "failed to read max brightness value"),
 
-            SweepError(err) => write!(f, "Failed to sweep write to brightness file ({err})"),
+            SweepError(err) => write!(f, "failed to sweep write to brightness file ({err})"),
 
             ValueTooLarge { given, supported } => write!(
                 f,
-                "Provided value ({given}) is larger than the max supported value of {supported}"
+                "provided value ({given}) is larger than the max supported value of {supported}"
             ),
         }
     }

@@ -350,15 +350,15 @@ impl PanicReporter {
         let tip = "This is unexpected behavior. Please report this issue at https://github.com/VoltaireNoir/blight/issues";
         if let Some(s) = info.payload().downcast_ref::<&str>() {
             eprintln!(
-                "{} A panic occured at {s:?}\n{} {tip}",
-                "Error:".red().bold(),
-                "Tip:".yellow().bold(),
+                "{} a panic occured at {s:?}\n{} {tip}",
+                "Error".red().bold(),
+                "Tip".yellow().bold(),
             );
         } else {
             eprintln!(
-                "{} A panic occured for unknown reason\n{} {tip}",
-                "Error:".red().bold(),
-                "Tip:".yellow().bold(),
+                "{} a panic occured for unknown reason\n{} {tip}",
+                "Error".red().bold(),
+                "Tip".yellow().bold(),
             );
         }
     }
