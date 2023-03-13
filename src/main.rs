@@ -3,6 +3,8 @@ use std::env;
 mod utils;
 
 fn main() {
+    utils::PanicReporter::init();
+
     if utils::is_running() {
         utils::print_err("Another instance of blight is already running".into());
         return;

@@ -337,3 +337,29 @@ pub fn restore() -> Result<(), DynError> {
     device.write_value(value)?;
     Ok(())
 }
+
+pub struct PanicReporter;
+
+impl PanicReporter {
+    pub fn init() {
+        if !cfg!(debug_assertions) {
+            std::panic::set_hook(Box::new(Self::report));
+        }
+    }
+    fn report(info: &std::panic::PanicInfo) {
+        let tip = "This is unexpected behavior. Please report this issue at https://github.com/VoltaireNoir/blight/issues";
+        if let Some(s) = info.payload().downcast_ref::<&str>() {
+            eprintln!(
+                "{} A panic occured at {s:?}\n{} {tip}",
+                "Error:".red().bold(),
+                "Tip:".yellow().bold(),
+            );
+        } else {
+            eprintln!(
+                "{} A panic occured for unknown reason\n{} {tip}",
+                "Error:".red().bold(),
+                "Tip:".yellow().bold(),
+            );
+        }
+    }
+}
