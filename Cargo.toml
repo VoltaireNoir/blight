@@ -18,3 +18,12 @@ strip = true
 lto = true
 codegen-units = 1
 panic = 'abort'
+
+[profile.dist]
+inherits = "release"
+
+[workspace.metadata.dist]
+cargo-dist-version = "0.0.4"
+rust-toolchain-version = "1.68.0"
+ci = ["github"]
+targets = ["x86_64-unknown-linux-gnu"]
