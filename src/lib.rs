@@ -237,6 +237,12 @@ impl Device {
     /// # Errors
     /// - [``BlibError::WriteNewVal``] - on write failure
     pub fn write_value(&self, value: u16) -> BlResult<()> {
+        if value > self.max {
+            return Err(BlibError::ValueTooLarge {
+                given: value,
+                supported: self.max,
+            });
+        }
         let convert = |err| BlibError::WriteNewVal {
             err,
             dev: self.name.clone(),
@@ -365,7 +371,7 @@ pub fn change_bl(
 pub fn set_bl(val: u16, device_name: Option<Cow<str>>) -> Result<(), BlibError> {
     let device = Device::new(device_name)?;
 
-    if val <= device.max && val != device.current {
+    if val != device.current {
         device.write_value(val)?;
     }
     Ok(())

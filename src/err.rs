@@ -14,6 +14,7 @@ pub enum BlibError {
     ReadMax,
     ReadCurrent,
     SweepError(std::io::Error),
+    ValueTooLarge { given: u16, supported: u16 },
 }
 
 #[doc(hidden)]
@@ -59,6 +60,11 @@ impl std::fmt::Display for BlibError {
             ReadMax => write!(f, "Failed to read max brightness value"),
 
             SweepError(err) => write!(f, "Failed to sweep write to brightness file ({err})"),
+
+            ValueTooLarge { given, supported } => write!(
+                f,
+                "Provided value ({given}) is larger than the max supported value of {supported}"
+            ),
         }
     }
 }
