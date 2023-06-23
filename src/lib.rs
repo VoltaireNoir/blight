@@ -32,6 +32,9 @@
 //! }
 //! ```
 
+#[cfg(not(target_os = "linux"))]
+compile_error!("blight is only supported on linux");
+
 use err::BlibError;
 use std::{
     borrow::Cow,
