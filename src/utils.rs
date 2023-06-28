@@ -5,7 +5,16 @@ use blight::{
     BLDIR,
 };
 use colored::Colorize;
-use std::{borrow::Cow, env, env::Args, error::Error, fs, iter::Skip, path::PathBuf, process};
+use fd_lock::{RwLock, RwLockWriteGuard};
+use std::{
+    borrow::Cow,
+    env,
+    env::Args,
+    error::Error,
+    fs::{self, File, OpenOptions},
+    iter::Skip,
+    path::PathBuf,
+};
 
 mod setup;
 
@@ -114,8 +123,14 @@ pub fn execute(conf: Config) -> Result<SuccessMessage, DynError> {
         Status => print_status(conf.options.device)?,
         Save => save(conf.options.device)?,
         Restore => restore()?,
-        Set(v) => blight::set_bl(v, conf.options.device)?,
+        Set(v) => {
+            let mut lock_file = Lock::init();
+            let _lock = lock_file.lock();
+            blight::set_bl(v, conf.options.device)?
+        }
         Adjust { dir, value } => {
+            let mut lock_file = Lock::init();
+            let _lock = lock_file.lock();
             blight::change_bl(value, conf.options.sweep, dir, conf.options.device)?
         }
     };
@@ -196,16 +211,6 @@ fn gen_success_msg(cm: &Command) -> SuccessMessage {
         Adjust { .. } => "Backlight changed",
         _ => "",
     }
-}
-
-pub fn is_running() -> bool {
-    let out = process::Command::new("pgrep")
-        .arg("-x")
-        .arg(env::current_exe().unwrap().file_name().unwrap())
-        .output()
-        .expect("Process command failed");
-    let out = String::from_utf8(out.stdout).expect("Failed to convert");
-    out.trim().len() > 6
 }
 
 fn check_write_perm(device_name: &str, bldir: &str) -> Result<(), std::io::Error> {
@@ -361,5 +366,29 @@ impl PanicReporter {
                 "Tip".yellow().bold(),
             );
         }
+    }
+}
+
+struct Lock {
+    file: RwLock<File>,
+}
+
+impl Lock {
+    fn init() -> Lock {
+        let file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .open("/tmp/blight.lock")
+            .expect("failed to open lock file at /tmp/blight.lock");
+        Lock {
+            file: RwLock::new(file),
+        }
+    }
+    fn lock(&mut self) -> RwLockWriteGuard<'_, File> {
+        let lock = self
+            .file
+            .write()
+            .expect("failed to acquire lock on /tmp/blight.lock");
+        lock
     }
 }
