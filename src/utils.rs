@@ -355,15 +355,14 @@ impl PanicReporter {
         eprintln!("{} A panic occured", "Error".red().bold());
         eprint!("{} ", "Reason".magenta().bold());
         let payload = info.payload();
-        let mut cause = vec![];
-        if let Some(pay) = payload.downcast_ref::<&str>() {
-            cause.push(pay.to_string());
+        let cause = if let Some(pay) = payload.downcast_ref::<&str>() {
+            pay.to_string()
         } else if let Some(pay) = payload.downcast_ref::<String>() {
-            cause.push(pay.to_string());
+            pay.to_string()
         } else {
-            cause.push("Unknown".to_owned());
-        }
-        cause.iter().for_each(|c| eprintln!("{c}"));
+            "Unknown".to_owned()
+        };
+        eprintln!("{cause}");
         if let Some(loc) = info.location() {
             eprintln!("{} {}", "Location".blue().bold(), loc);
         }
