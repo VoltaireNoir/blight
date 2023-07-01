@@ -352,19 +352,22 @@ impl PanicReporter {
     }
     fn report(info: &std::panic::PanicInfo) {
         let tip = "This is unexpected behavior. Please report this issue at https://github.com/VoltaireNoir/blight/issues";
-        if let Some(s) = info.payload().downcast_ref::<&str>() {
-            eprintln!(
-                "{} a panic occured at {s:?}\n{} {tip}",
-                "Error".red().bold(),
-                "Tip".yellow().bold(),
-            );
+        eprintln!("{} A panic occured", "Error".red().bold());
+        eprint!("{} ", "Reason".magenta().bold());
+        let payload = info.payload();
+        let mut cause = vec![];
+        if let Some(pay) = payload.downcast_ref::<&str>() {
+            cause.push(pay.to_string());
+        } else if let Some(pay) = payload.downcast_ref::<String>() {
+            cause.push(pay.to_string());
         } else {
-            eprintln!(
-                "{} a panic occured for unknown reason\n{} {tip}",
-                "Error".red().bold(),
-                "Tip".yellow().bold(),
-            );
+            cause.push("Unknown".to_owned());
         }
+        cause.iter().for_each(|c| eprintln!("{c}"));
+        if let Some(loc) = info.location() {
+            eprintln!("{} {}", "Location".blue().bold(), loc);
+        }
+        eprintln!("{} {tip}", "Tip".yellow().bold());
     }
 }
 
@@ -373,7 +376,7 @@ fn acquire_lock() -> File {
         .write(true)
         .create(true)
         .open(LOCKFILE)
-        .expect("failed to open lock file at /tmp/blight.lock");
+        .expect("failed to open lock file");
     if file.try_lock_exclusive().is_ok() {
         return file;
     }
@@ -382,7 +385,6 @@ fn acquire_lock() -> File {
         "Status".magenta().bold(),
         "Waiting for another instance to finish"
     );
-    file.lock_exclusive()
-        .expect("failed to acquire lock on /tmp/blight.lock");
+    file.lock_exclusive().expect("failed to acquire lock");
     file
 }
