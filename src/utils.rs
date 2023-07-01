@@ -5,7 +5,7 @@ use blight::{
     BLDIR,
 };
 use colored::Colorize;
-use fd_lock::{RwLock, RwLockWriteGuard};
+use fs4::FileExt;
 use std::{
     borrow::Cow,
     env,
@@ -19,6 +19,7 @@ use std::{
 mod setup;
 
 const SAVEDIR: &str = "/.local/share/blight";
+const LOCKFILE: &str = "/tmp/blight.lock";
 
 type DynError = Box<dyn Error + 'static>;
 
@@ -124,13 +125,11 @@ pub fn execute(conf: Config) -> Result<SuccessMessage, DynError> {
         Save => save(conf.options.device)?,
         Restore => restore()?,
         Set(v) => {
-            let mut lock_file = Lock::init();
-            let _lock = lock_file.lock();
+            let _lock = acquire_lock();
             blight::set_bl(v, conf.options.device)?
         }
         Adjust { dir, value } => {
-            let mut lock_file = Lock::init();
-            let _lock = lock_file.lock();
+            let _lock = acquire_lock();
             blight::change_bl(value, conf.options.sweep, dir, conf.options.device)?
         }
     };
@@ -369,26 +368,21 @@ impl PanicReporter {
     }
 }
 
-struct Lock {
-    file: RwLock<File>,
-}
-
-impl Lock {
-    fn init() -> Lock {
-        let file = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .open("/tmp/blight.lock")
-            .expect("failed to open lock file at /tmp/blight.lock");
-        Lock {
-            file: RwLock::new(file),
-        }
+fn acquire_lock() -> File {
+    let file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .open(LOCKFILE)
+        .expect("failed to open lock file at /tmp/blight.lock");
+    if file.try_lock_exclusive().is_ok() {
+        return file;
     }
-    fn lock(&mut self) -> RwLockWriteGuard<'_, File> {
-        let lock = self
-            .file
-            .write()
-            .expect("failed to acquire lock on /tmp/blight.lock");
-        lock
-    }
+    println!(
+        "{} {}",
+        "Status".magenta().bold(),
+        "Waiting for another instance to finish"
+    );
+    file.lock_exclusive()
+        .expect("failed to acquire lock on /tmp/blight.lock");
+    file
 }
