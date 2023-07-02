@@ -5,11 +5,21 @@ use blight::{
     BLDIR,
 };
 use colored::Colorize;
-use std::{borrow::Cow, env, env::Args, error::Error, fs, iter::Skip, path::PathBuf, process};
+use fs4::FileExt;
+use std::{
+    borrow::Cow,
+    env,
+    env::Args,
+    error::Error,
+    fs::{self, File, OpenOptions},
+    iter::Skip,
+    path::PathBuf,
+};
 
 mod setup;
 
 const SAVEDIR: &str = "/.local/share/blight";
+const LOCKFILE: &str = "/tmp/blight.lock";
 
 type DynError = Box<dyn Error + 'static>;
 
@@ -114,8 +124,12 @@ pub fn execute(conf: Config) -> Result<SuccessMessage, DynError> {
         Status => print_status(conf.options.device)?,
         Save => save(conf.options.device)?,
         Restore => restore()?,
-        Set(v) => blight::set_bl(v, conf.options.device)?,
+        Set(v) => {
+            let _lock = acquire_lock();
+            blight::set_bl(v, conf.options.device)?
+        }
         Adjust { dir, value } => {
+            let _lock = acquire_lock();
             blight::change_bl(value, conf.options.sweep, dir, conf.options.device)?
         }
     };
@@ -196,16 +210,6 @@ fn gen_success_msg(cm: &Command) -> SuccessMessage {
         Adjust { .. } => "Backlight changed",
         _ => "",
     }
-}
-
-pub fn is_running() -> bool {
-    let out = process::Command::new("pgrep")
-        .arg("-x")
-        .arg(env::current_exe().unwrap().file_name().unwrap())
-        .output()
-        .expect("Process command failed");
-    let out = String::from_utf8(out.stdout).expect("Failed to convert");
-    out.trim().len() > 6
 }
 
 fn check_write_perm(device_name: &str, bldir: &str) -> Result<(), std::io::Error> {
@@ -348,18 +352,37 @@ impl PanicReporter {
     }
     fn report(info: &std::panic::PanicInfo) {
         let tip = "This is unexpected behavior. Please report this issue at https://github.com/VoltaireNoir/blight/issues";
-        if let Some(s) = info.payload().downcast_ref::<&str>() {
-            eprintln!(
-                "{} a panic occured at {s:?}\n{} {tip}",
-                "Error".red().bold(),
-                "Tip".yellow().bold(),
-            );
+        let payload = info.payload();
+        let cause = if let Some(pay) = payload.downcast_ref::<&str>() {
+            pay.to_string()
+        } else if let Some(pay) = payload.downcast_ref::<String>() {
+            pay.to_string()
         } else {
-            eprintln!(
-                "{} a panic occured for unknown reason\n{} {tip}",
-                "Error".red().bold(),
-                "Tip".yellow().bold(),
-            );
+            "Unknown".to_owned()
+        };
+        eprintln!("{} A panic occured", "Error".red().bold());
+        eprintln!("{} {cause}", "Reason".magenta().bold());
+        if let Some(loc) = info.location() {
+            eprintln!("{} {}", "Location".blue().bold(), loc);
         }
+        eprintln!("{} {tip}", "Tip".yellow().bold());
     }
+}
+
+fn acquire_lock() -> File {
+    let file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .open(LOCKFILE)
+        .expect("failed to open lock file");
+    if file.try_lock_exclusive().is_ok() {
+        return file;
+    }
+    println!(
+        "{} {}",
+        "Status".magenta().bold(),
+        "Waiting for another instance to finish"
+    );
+    file.lock_exclusive().expect("failed to acquire lock");
+    file
 }
