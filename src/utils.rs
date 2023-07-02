@@ -352,8 +352,6 @@ impl PanicReporter {
     }
     fn report(info: &std::panic::PanicInfo) {
         let tip = "This is unexpected behavior. Please report this issue at https://github.com/VoltaireNoir/blight/issues";
-        eprintln!("{} A panic occured", "Error".red().bold());
-        eprint!("{} ", "Reason".magenta().bold());
         let payload = info.payload();
         let cause = if let Some(pay) = payload.downcast_ref::<&str>() {
             pay.to_string()
@@ -362,7 +360,8 @@ impl PanicReporter {
         } else {
             "Unknown".to_owned()
         };
-        eprintln!("{cause}");
+        eprintln!("{} A panic occured", "Error".red().bold());
+        eprintln!("{} {cause}", "Reason".magenta().bold());
         if let Some(loc) = info.location() {
             eprintln!("{} {}", "Location".blue().bold(), loc);
         }
