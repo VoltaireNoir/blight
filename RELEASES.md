@@ -16,3 +16,18 @@
 - Integer overflow while using sweep change (#1)
 - `Device::write_value` & `set_bl` silently ignoring or writing values larger than max supported (f30b3c5)
 - Stdout and Stderr message formatting inconsistencies
+
+# Version 0.6.0
+
+### Summary
+Fixed a major bug related to single instance check, which also changes the CLI behavior slightly. Improved error reporting in case of panics. Most changes in this release only affect the CLI side of things.
+
+### Changed
+- CLI no longer returns an error if another instance is running. Instead, it waits for it to finish (#5)
+- blight no longer compiles on OSs other than Linux, as they are unsupported
+
+### Improved
+- Custom panic handler now properly prints panic related info to the user to help with better bug reports
+
+### Fixed
+- CLI falsely reporting that another instance is running (#4)
