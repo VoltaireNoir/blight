@@ -36,8 +36,8 @@ enum Command {
     Save,
     Restore,
     List,
-    Adjust { dir: Direction, value: u16 },
-    Set(u16),
+    Adjust { dir: Direction, value: u32 },
+    Set(u32),
 }
 
 #[derive(Default)]
@@ -82,7 +82,7 @@ pub fn parse<'a>(mut args: Skip<Args>) -> Result<Config<'a>, DynError> {
             "save" => (Save, option_parser(args)),
 
             "set" => {
-                let val: u16 = args
+                let val: u32 = args
                     .next()
                     .ok_or(MissingValue)?
                     .parse()
@@ -92,7 +92,7 @@ pub fn parse<'a>(mut args: Skip<Args>) -> Result<Config<'a>, DynError> {
             }
 
             ch @ ("inc" | "dec") => {
-                let value: u16 = args
+                let value: u32 = args
                     .next()
                     .ok_or(MissingValue)?
                     .parse()
@@ -337,7 +337,7 @@ pub fn restore() -> Result<(), DynError> {
     let (device_name, val) = restore.split_once(' ').unwrap();
     let device = Device::new(Some(device_name.into()))?;
 
-    let value: u16 = val.parse().map_err(|_| BlightError::SaveParseErr)?;
+    let value: u32 = val.parse().map_err(|_| BlightError::SaveParseErr)?;
     device.write_value(value)?;
     Ok(())
 }
