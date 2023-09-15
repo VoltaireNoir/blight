@@ -460,6 +460,17 @@ mod tests {
     }
 
     #[test]
+    fn current_percent() {
+        let device = Device {
+            name: "".into(),
+            current: 5,
+            max: 255,
+            device_dir: "".into(),
+        };
+        assert_eq!(device.current_percent().round(), 2.0);
+    }
+
+    #[test]
     fn inc_calculation() {
         let d = Device {
             name: String::new(),
