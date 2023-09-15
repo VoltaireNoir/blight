@@ -155,6 +155,11 @@ impl Device {
         self.current
     }
 
+    /// Returns the device's current brightness percentage (not rounded)
+    pub fn current_percent(&self) -> f64 {
+        (self.current as f64 / self.max as f64) * 100.
+    }
+
     /// Returns the max brightness value of the current device
     pub fn max(&self) -> u32 {
         self.max
