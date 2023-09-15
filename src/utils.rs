@@ -228,11 +228,12 @@ pub fn print_status(device_name: Option<Cow<str>>) -> Result<(), BlibError> {
     };
 
     println!(
-        "{}\nDetected device: {}\nWrite permission: {}\nCurrent brightness: {}\nMax brightness: {}",
+        "{}\nDetected device: {}\nWrite permission: {}\nCurrent brightness: {}, {}%\nMax brightness: {}",
         "Device status".bold(),
         device.name().green(),
         write_perm,
         device.current().to_string().green(),
+        device.current_percent().round().to_string().green(),
         device.max().to_string().green()
     );
     Ok(())
