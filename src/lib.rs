@@ -117,8 +117,8 @@ impl Delay {
 #[derive(Debug, Clone)]
 pub struct Device {
     name: String,
-    current: u16,
-    max: u16,
+    current: u32,
+    max: u32,
     device_dir: String,
 }
 
@@ -151,12 +151,12 @@ impl Device {
     }
 
     /// Returns the current brightness value of the current device
-    pub fn current(&self) -> u16 {
+    pub fn current(&self) -> u32 {
         self.current
     }
 
     /// Returns the max brightness value of the current device
-    pub fn max(&self) -> u16 {
+    pub fn max(&self) -> u32 {
         self.max
     }
 
@@ -219,8 +219,8 @@ impl Device {
         self.current = Device::get_current(&self.device_dir).unwrap();
     }
 
-    fn get_max(device_dir: &str) -> BlResult<u16> {
-        let max: u16 = fs::read_to_string(format!("{device_dir}/max_brightness"))
+    fn get_max(device_dir: &str) -> BlResult<u32> {
+        let max: u32 = fs::read_to_string(format!("{device_dir}/max_brightness"))
             .or(Err(BlibError::ReadMax))?
             .trim()
             .parse()
@@ -228,8 +228,8 @@ impl Device {
         Ok(max)
     }
 
-    fn get_current(device_dir: &str) -> BlResult<u16> {
-        let current: u16 = fs::read_to_string(format!("{device_dir}/brightness"))
+    fn get_current(device_dir: &str) -> BlResult<u32> {
+        let current: u32 = fs::read_to_string(format!("{device_dir}/brightness"))
             .or(Err(BlibError::ReadCurrent))?
             .trim()
             .parse()
@@ -239,7 +239,7 @@ impl Device {
     /// Writes to the brightness file containted in /sys/class/backlight/ dir of the respective detected device, which will result in change of brightness if successful and if the chosen device is the correct one.
     /// # Errors
     /// - [``BlibError::WriteNewVal``] - on write failure
-    pub fn write_value(&self, value: u16) -> BlResult<()> {
+    pub fn write_value(&self, value: u32) -> BlResult<()> {
         if value > self.max {
             return Err(BlibError::ValueTooLarge {
                 given: value,
@@ -270,9 +270,9 @@ impl Device {
     /// # Errors
     /// Possible errors that can result from this function include:
     /// * [``BlibError::SweepError``]
-    pub fn sweep_write(&self, value: u16, delay: Delay) -> Result<(), BlibError> {
+    pub fn sweep_write(&self, value: u32, delay: Delay) -> Result<(), BlibError> {
         let mut bfile = self.open_bl_file().map_err(BlibError::SweepError)?;
-        let mut rate = (f32::from(self.max) * 0.01) as u16;
+        let mut rate = (f64::from(self.max) * 0.01) as u32;
         let mut current = self.current;
         let dir = if value > self.current {
             Direction::Inc
@@ -314,9 +314,9 @@ impl Device {
     /// For example, if the currecnt value is 10 and max is 100, and you want to increase it by 10% (step_size),
     /// the method will return 20, which can be directly written to the device.
     ///
-    pub fn calculate_change(&self, step_size: u16, dir: Direction) -> u16 {
-        let step: u16 = (self.max as f32 * (step_size as f32 / 100.0)) as u16;
-        let change: u16 = match dir {
+    pub fn calculate_change(&self, step_size: u32, dir: Direction) -> u32 {
+        let step: u32 = (self.max as f32 * (step_size as f32 / 100.0)) as u32;
+        let change: u32 = match dir {
             Direction::Inc => self.current.saturating_add(step),
             Direction::Dec => self.current.saturating_sub(step),
         };
@@ -339,7 +339,7 @@ impl Device {
 /// * All errors that can result from [``Device::new``]
 /// * [``BlibError::WriteNewVal``]
 pub fn change_bl(
-    step_size: u16,
+    step_size: u32,
     ch: Change,
     dir: Direction,
     device_name: Option<Cow<str>>,
@@ -372,7 +372,7 @@ pub fn change_bl(
 /// * All errors that can result from [``Device::new``]
 /// * [``BlibError::WriteNewVal``]
 /// * [``BlibError::ValueTooLarge``]
-pub fn set_bl(val: u16, device_name: Option<Cow<str>>) -> Result<(), BlibError> {
+pub fn set_bl(val: u32, device_name: Option<Cow<str>>) -> Result<(), BlibError> {
     let device = Device::new(device_name)?;
 
     if val != device.current {
@@ -522,7 +522,7 @@ mod tests {
         setup_test_env(&["generic"]).unwrap();
         let mut d = test_device("generic");
         d.write_value(0).unwrap();
-        d.sweep_write(u16::MAX, Delay::default()).unwrap();
+        d.sweep_write(u32::MAX, Delay::default()).unwrap();
         d.reload();
         assert_eq!(d.current, 0);
         clean_up();

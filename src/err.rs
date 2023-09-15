@@ -14,7 +14,7 @@ pub enum BlibError {
     ReadMax,
     ReadCurrent,
     SweepError(std::io::Error),
-    ValueTooLarge { given: u16, supported: u16 },
+    ValueTooLarge { given: u32, supported: u32 },
 }
 
 #[doc(hidden)]
