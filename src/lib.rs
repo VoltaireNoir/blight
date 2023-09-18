@@ -233,7 +233,10 @@ impl Device {
     }
 
     fn read_value<P: AsRef<Path>>(path: P) -> Result<u32, Box<dyn Error>> {
-        let max: u32 = fs::read_to_string(path)?.trim().parse()?;
+        let mut buf = [0; 10]; // can hold string repr of u32::MAX
+        fs::File::open(path)?.read(&mut buf)?;
+        let pat: &[_] = &['\0', '\n', ' '];
+        let max: u32 = std::str::from_utf8(&buf)?.trim_matches(pat).parse()?;
         Ok(max)
     }
 
@@ -452,6 +455,15 @@ mod tests {
             .expect("failed to read test backlight value");
         let res = r.trim();
         assert_eq!("100", res, "Result was {res}");
+        clean_up();
+    }
+
+    #[test]
+    fn read_value() {
+        clean_up();
+        let name = "generic";
+        setup_test_env(&[name]).unwrap();
+        assert_eq!(50, Device::read_value(test_path(name)).unwrap());
         clean_up();
     }
 
