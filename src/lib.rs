@@ -38,6 +38,7 @@ compile_error!("blight is only supported on linux");
 use err::BlibError;
 use std::{
     borrow::Cow,
+    error::Error,
     fs::{self, File},
     io::prelude::*,
     ops::Deref,
@@ -51,6 +52,8 @@ pub use err::BlResult;
 
 /// Linux backlight directory location. All backlight hardware devices appear here.
 pub const BLDIR: &str = "/sys/class/backlight";
+const CURRENT_FILE: &str = "brightness";
+const MAX_FILE: &str = "max_brightness";
 
 /// This enum is used to specify the direction in which the backlight should be changed in the [``change_bl``] and [``Device::calculate_change``] functions.
 /// Inc -> Increase, Dec -> Decrease.
@@ -119,7 +122,7 @@ pub struct Device {
     name: String,
     current: u32,
     max: u32,
-    device_dir: String,
+    path: PathBuf, // Brightness file path
 }
 
 impl Device {
@@ -133,16 +136,30 @@ impl Device {
     /// * [``BlibError::ReadCurrent``]
     /// * [``BlibError::ReadMax``]
     pub fn new(name: Option<Cow<str>>) -> BlResult<Device> {
-        let name = if let Some(n) = name {
-            PathBuf::from(format!("{BLDIR}/{n}/brightness"))
-                .is_file()
-                .then_some(n)
-                .ok_or(BlibError::NoDeviceFound)?
-        } else {
-            Cow::from(Self::detect_device(BLDIR)?)
+        let name = name
+            .and_then(|n| Some(n))
+            .unwrap_or(Cow::from(Self::detect_device(BLDIR)?));
+        let mut path = Self::construct_path(BLDIR, &name);
+        path.push(MAX_FILE);
+        if !path.is_file() {
+            return Err(BlibError::NoDeviceFound);
         };
-        let device = Self::load(name)?;
-        Ok(device)
+        let max = Self::read_value(&path).map_err(|_| BlibError::ReadMax)?;
+        path.set_file_name(CURRENT_FILE);
+        let current = Self::read_value(&path).map_err(|_| BlibError::ReadCurrent)?;
+        Ok(Device {
+            current,
+            max,
+            path,
+            name: name.into_owned(),
+        })
+    }
+
+    fn construct_path(bldir: &str, device_name: &str) -> PathBuf {
+        let mut buf = PathBuf::with_capacity(bldir.len() + device_name.len() + 1);
+        buf.push(bldir);
+        buf.push(device_name);
+        buf
     }
 
     /// Returns the name of the current device
@@ -165,18 +182,11 @@ impl Device {
         self.max
     }
 
-    fn load(name: Cow<str>) -> BlResult<Device> {
-        let device_dir = format!("{BLDIR}/{name}");
-        Ok(Device {
-            current: Self::get_current(&device_dir)?,
-            max: Self::get_max(&device_dir)?,
-            device_dir,
-            name: name.into(),
-        })
-    }
-
-    pub fn device_path(&self) -> &Path {
-        self.device_dir.as_ref()
+    /// Returns absolute path that points to the device directory in `/sys/class/backlight`
+    pub fn device_path(&self) -> PathBuf {
+        let mut buf = self.path.to_path_buf();
+        buf.pop();
+        buf
     }
 
     fn detect_device(bldir: &str) -> BlResult<String> {
@@ -212,35 +222,21 @@ impl Device {
     }
 
     fn open_bl_file(&self) -> Result<File, std::io::Error> {
-        let mut path = self.device_path().to_path_buf();
-        path.push("brightness");
-        fs::File::options().write(true).open(path)
+        fs::File::options().write(true).open(&self.path)
     }
 
     /// Reloads current value for the current device in place.
     /// # Panics
     /// The method panics if the current value fails to be read from the filesystem.
     pub fn reload(&mut self) {
-        self.current = Device::get_current(&self.device_dir).unwrap();
+        self.current = Device::read_value(&self.path).unwrap();
     }
 
-    fn get_max(device_dir: &str) -> BlResult<u32> {
-        let max: u32 = fs::read_to_string(format!("{device_dir}/max_brightness"))
-            .or(Err(BlibError::ReadMax))?
-            .trim()
-            .parse()
-            .or(Err(BlibError::ReadMax))?;
+    fn read_value<P: AsRef<Path>>(path: P) -> Result<u32, Box<dyn Error>> {
+        let max: u32 = fs::read_to_string(path)?.trim().parse()?;
         Ok(max)
     }
 
-    fn get_current(device_dir: &str) -> BlResult<u32> {
-        let current: u32 = fs::read_to_string(format!("{device_dir}/brightness"))
-            .or(Err(BlibError::ReadCurrent))?
-            .trim()
-            .parse()
-            .or(Err(BlibError::ReadCurrent))?;
-        Ok(current)
-    }
     /// Writes to the brightness file containted in /sys/class/backlight/ dir of the respective detected device, which will result in change of brightness if successful and if the chosen device is the correct one.
     /// # Errors
     /// - [``BlibError::WriteNewVal``] - on write failure
@@ -393,6 +389,14 @@ mod tests {
     const TESTDIR: &str = "testbldir";
 
     #[test]
+    fn path_construction() {
+        assert_eq!(
+            Device::construct_path(BLDIR, "generic"),
+            PathBuf::from("/sys/class/backlight/generic")
+        );
+    }
+
+    #[test]
     fn detecting_device_nvidia() {
         clean_up();
         setup_test_env(&["nvidia_0", "generic"]).unwrap();
@@ -435,12 +439,13 @@ mod tests {
     #[test]
     fn writing_value() {
         clean_up();
-        setup_test_env(&["generic"]).unwrap();
+        let name = "generic";
+        setup_test_env(&[name]).unwrap();
         let d = Device {
-            name: "generic".to_string(),
+            name: name.to_string(),
             max: 100,
             current: 50,
-            device_dir: format!("{TESTDIR}/generic"),
+            path: test_path(name),
         };
         d.write_value(100).unwrap();
         let r = fs::read_to_string(format!("{TESTDIR}/generic/brightness"))
@@ -453,9 +458,10 @@ mod tests {
     #[test]
     fn current_value() {
         clean_up();
-        setup_test_env(&["generic"]).unwrap();
-        let current = Device::get_current(&format!("{TESTDIR}/generic")).unwrap();
-        assert_eq!(current.to_string(), "50");
+        let name = "generic";
+        setup_test_env(&[name]).unwrap();
+        let current = Device::read_value(test_path(name)).unwrap();
+        assert_eq!(current, 50);
         clean_up();
     }
 
@@ -465,7 +471,7 @@ mod tests {
             name: "".into(),
             current: 5,
             max: 255,
-            device_dir: "".into(),
+            path: test_path(""),
         };
         assert_eq!(device.current_percent().round(), 2.0);
     }
@@ -476,7 +482,7 @@ mod tests {
             name: String::new(),
             current: 10,
             max: 100,
-            device_dir: String::new(),
+            path: test_path(""),
         };
         let ch = d.calculate_change(10, Direction::Inc);
         assert_eq!(ch, 20);
@@ -488,7 +494,7 @@ mod tests {
             name: String::new(),
             current: 30,
             max: 100,
-            device_dir: String::new(),
+            path: test_path(""),
         };
         let ch = d.calculate_change(10, Direction::Dec);
         assert_eq!(ch, 20);
@@ -500,7 +506,7 @@ mod tests {
             name: String::new(),
             current: 90,
             max: 100,
-            device_dir: String::new(),
+            path: test_path(""),
         };
         let ch = d.calculate_change(20, Direction::Inc);
         assert_eq!(ch, 100);
@@ -512,7 +518,7 @@ mod tests {
             name: String::new(),
             current: 10,
             max: 100,
-            device_dir: String::new(),
+            path: test_path(""),
         };
         let ch = d.calculate_change(20, Direction::Dec);
         assert_eq!(ch, 0);
@@ -549,7 +555,7 @@ mod tests {
         for dir in dirs {
             fs::create_dir(format!("{TESTDIR}/{dir}"))?;
             fs::write(format!("{TESTDIR}/{dir}/brightness"), "50")?;
-            fs::write(format!("{TESTDIR}/{dir}/max"), "100")?;
+            fs::write(format!("{TESTDIR}/{dir}/max_brightness"), "100")?;
         }
         Ok(())
     }
@@ -559,8 +565,14 @@ mod tests {
             name: name.into(),
             current: 50,
             max: 100,
-            device_dir: format!("{TESTDIR}/{name}"),
+            path: test_path(name),
         }
+    }
+
+    fn test_path(name: &str) -> PathBuf {
+        let mut path = Device::construct_path(TESTDIR, name);
+        path.push(CURRENT_FILE);
+        path
     }
 
     fn clean_up() {
