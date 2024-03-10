@@ -5,18 +5,24 @@
 //! by using the command `cargo add blight` in your Rust project. The CLI utility, on the other hand, can be installed by running `cargo install blight`.
 //! This documentation only covers the library aspect, for CLI related docs, visit the project's [Github repo](https://github.com/voltaireNoir/blight).
 //!
-//! Two features of blight that standout:
-//! 1. Prioritizing device detection in this order: iGPU>dGPU>ACPI>Fallback device.
-//! 2. Smooth backlight change by writing in increments/decrements of 1 with a few milliseconds of delay. \
+//! The latest version of the libary now supports [controlling LEDs][led] using the `/sys/class/leds` interface.
+//!
+//! Three features of blight that standout:
+//! 1. Prioritizing backlight device detection in this order: iGPU>dGPU>ACPI>Fallback device.
+//! 2. Smooth dimming by writing in increments/decrements of 1 with a few milliseconds of delay ([sweep write][Light::sweep_write]).
+//! 3. The library has zero external dependencies.
+//!
 //! > **IMPORTANT:** You need write permission for the file `/sys/class/backlight/{your_device}/brightness` to change brightness.
 //! > The CLI utility comes with a helper script that let's you gain access to the brightness file (which may not always work), which you can run by using the command `sudo blight setup`.
 //! > If you're only using blight as a dependency, you can read about gaining file permissions [here](https://wiki.archlinux.org/title/Backlight#ACPI).
 //!
-//! # Usage
-//! ```ignore
-//! use blight::{BlResult, Change, Device, Direction, Delay};
+//! **For LED specific documentation and usage, see [led module][led].**
 //!
-//! fn main() -> BlResult<()> {
+//! # Usage
+//! ```no_run
+//! use blight::{Change, Device, Direction, Delay, Light};
+//!
+//! fn main() -> blight::Result<()> {
 //!     // Using the helper functions
 //!     blight::change_bl(5, Change::Regular, Direction::Inc, None)?; // Increases brightness by 5%
 //!     blight::set_bl(50, Some("nvidia_0".into()))?; // Sets brightness value (not percentage) to 50
@@ -35,10 +41,8 @@
 #[cfg(not(target_os = "linux"))]
 compile_error!("blight is only supported on linux");
 
-use err::BlibError;
 use std::{
     borrow::Cow,
-    error::Error,
     fs::{self, File},
     io::prelude::*,
     ops::Deref,
@@ -48,7 +52,8 @@ use std::{
 };
 
 pub mod err;
-pub use err::BlResult;
+pub mod led;
+pub use err::{Error, ErrorKind, Result};
 
 /// Linux backlight directory location. All backlight hardware devices appear here.
 pub const BLDIR: &str = "/sys/class/backlight";
@@ -113,16 +118,29 @@ impl Delay {
 /// if no device is detected. \
 /// This is how the devices are priorirized: ``AmdGPU or Intel > Nvdia > ACPI > Any Fallback Device``, unless a device name is passed as an argument.
 /// # Examples
-/// ```ignore
-/// let bl = Device::new(None)?;
-/// bl.write_value(50)?;
+/// ```no_run
+/// use blight::{Device, Light};
+///
+/// fn main() -> blight::Result<()> {
+///   let mut bl = Device::new(None)?;
+///   println!(
+///     "Backlight device: {}, current brightness: {}, max brightness: {}",
+///     bl.name(),
+///     bl.current(),
+///     bl.max()
+///   );
+///   bl.write_value(50)?;
+///   bl.try_reload()?;
+///   Ok(())
+/// }
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Device {
     name: String,
     current: u32,
     max: u32,
-    path: PathBuf, // Brightness file path
+    path: PathBuf,
+    brightness: File,
 }
 
 impl Device {
@@ -131,67 +149,28 @@ impl Device {
     /// By default, it uses the priority detection method unless ``Some(device_name)`` is passed as an argument, then that name will be used to create an instance of that device if it exists.
     /// # Errors
     /// Possible errors that can result from this function include:
-    /// * [``BlibError::NoDeviceFound``]
-    /// * [``BlibError::ReadBlDir``]
-    /// * [``BlibError::ReadCurrent``]
-    /// * [``BlibError::ReadMax``]
-    pub fn new(name: Option<Cow<str>>) -> BlResult<Device> {
-        let name = name
-            .and_then(|n| Some(n))
-            .unwrap_or(Cow::from(Self::detect_device(BLDIR)?));
-        let mut path = Self::construct_path(BLDIR, &name);
-        path.push(MAX_FILE);
-        if !path.is_file() {
-            return Err(BlibError::NoDeviceFound);
+    /// * [``ErrorKind::NotFound``]
+    /// * [``ErrorKind::ReadDir``]
+    /// * [``ErrorKind::ReadCurrent``]
+    /// * [``ErrorKind::ReadMax``]
+    pub fn new(name: Option<Cow<str>>) -> Result<Device> {
+        let name = match name {
+            Some(val) => val,
+            None => Self::detect_device(BLDIR)?.into(),
         };
-        let max = Self::read_value(&path).map_err(|_| BlibError::ReadMax)?;
-        path.set_file_name(CURRENT_FILE);
-        let current = Self::read_value(&path).map_err(|_| BlibError::ReadCurrent)?;
+        let info = utils::read_info(BLDIR, &name)?;
         Ok(Device {
-            current,
-            max,
-            path,
+            current: info.current,
+            max: info.max,
+            path: info.path,
             name: name.into_owned(),
+            brightness: info.brightness,
         })
     }
 
-    fn construct_path(bldir: &str, device_name: &str) -> PathBuf {
-        let mut buf = PathBuf::with_capacity(bldir.len() + device_name.len() + 1);
-        buf.push(bldir);
-        buf.push(device_name);
-        buf
-    }
-
-    /// Returns the name of the current device
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    /// Returns the current brightness value of the current device
-    pub fn current(&self) -> u32 {
-        self.current
-    }
-
-    /// Returns the device's current brightness percentage (not rounded)
-    pub fn current_percent(&self) -> f64 {
-        (self.current as f64 / self.max as f64) * 100.
-    }
-
-    /// Returns the max brightness value of the current device
-    pub fn max(&self) -> u32 {
-        self.max
-    }
-
-    /// Returns absolute path that points to the device directory in `/sys/class/backlight`
-    pub fn device_path(&self) -> PathBuf {
-        let mut buf = self.path.to_path_buf();
-        buf.pop();
-        buf
-    }
-
-    fn detect_device(bldir: &str) -> BlResult<String> {
+    fn detect_device(bldir: &str) -> Result<String> {
         let dirs: Vec<_> = fs::read_dir(bldir)
-            .map_err(BlibError::ReadBlDir)?
+            .map_err(|err| Error::from(ErrorKind::ReadDir { dir: BLDIR }).with_source(err))?
             .filter_map(|d| d.ok().map(|d| d.file_name()))
             .collect();
 
@@ -217,44 +196,132 @@ impl Device {
         } else if !dirs.is_empty() {
             to_str(0)
         } else {
-            Err(BlibError::NoDeviceFound)
+            Err(ErrorKind::NotFound.into())
         }
     }
+}
 
-    fn open_bl_file(&self) -> Result<File, std::io::Error> {
-        fs::File::options().write(true).open(&self.path)
+impl private::Sealed for Device {}
+
+impl Light for Device {
+    type Value = u32;
+
+    fn name(&self) -> &str {
+        &self.name
     }
 
-    /// Reloads current value for the current device in place.
+    fn current(&self) -> Self::Value {
+        self.current
+    }
+
+    fn max(&self) -> Self::Value {
+        self.max
+    }
+
+    fn set_current(&mut self, _: private::Internal, current: Self::Value) {
+        self.current = current;
+    }
+
+    fn brightness_file(&mut self, _: private::Internal) -> &mut File {
+        &mut self.brightness
+    }
+
+    /// Returns absolute path that points to the device directory in `/sys/class/backlight`
+    fn device_path(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl Dimmable for Device {}
+impl Toggleable for Device {}
+
+mod private {
+    #[doc(hidden)]
+    pub struct Internal;
+    #[doc(hidden)]
+    pub trait Sealed {}
+}
+
+/// Marker trait to signify that a backlight device or an LED is dimmable
+pub trait Dimmable: Toggleable + private::Sealed {}
+
+/// Marker trait to signify that an LED can only be toggled on/off
+pub trait Toggleable: private::Sealed {}
+
+/// The interface for controlling both backlight and LED devices
+pub trait Light: private::Sealed {
+    type Value: Into<u32> + TryFrom<u32> + PartialEq + Default;
+
+    /// Name of the backlight/LED device
+    fn name(&self) -> &str;
+
+    /// Returns the current brightness value of the current device
+    fn current(&self) -> Self::Value;
+
+    /// Returns the max brightness value of the current device
+    fn max(&self) -> Self::Value;
+
+    /// Absolute path to the device interface in `/sys/class/..` directory
+    fn device_path(&self) -> &Path;
+
+    #[doc(hidden)]
+    fn set_current(&mut self, _: private::Internal, current: Self::Value);
+    #[doc(hidden)]
+    fn brightness_file(&mut self, _: private::Internal) -> &mut File;
+
+    /// Returns the device's current brightness percentage (not rounded)
+    fn current_percent(&self) -> f64
+    where
+        Self: Dimmable,
+    {
+        let (current, max): (u32, u32) = (self.current().into(), self.max().into());
+        (f64::from(current) / f64::from(max)) * 100.
+    }
+
+    /// Reloads current brightness value for the device
+    ///
+    /// Use the fallible [`Light::try_reload`] method if you want to handle the error and avoid causing panic at runtime.
+    ///
     /// # Panics
     /// The method panics if the current value fails to be read from the filesystem.
-    pub fn reload(&mut self) {
-        self.current = Device::read_value(&self.path).unwrap();
+    fn reload(&mut self) {
+        self.try_reload()
+            .expect("Failed to read current brightness value");
     }
 
-    fn read_value<P: AsRef<Path>>(path: P) -> Result<u32, Box<dyn Error>> {
-        let mut buf = [0; 10]; // can hold string repr of u32::MAX
-        fs::File::open(path)?.read(&mut buf)?;
-        let pat: &[_] = &['\0', '\n', ' '];
-        let max: u32 = std::str::from_utf8(&buf)?.trim_matches(pat).parse()?;
-        Ok(max)
+    /// Reloads current brightness value for the device
+    fn try_reload(&mut self) -> Result<()> {
+        let current = utils::read_ascii_u32(self.brightness_file(private::Internal))
+            .map_err(|err| Error::from(ErrorKind::ReadCurrent).with_source(err))?;
+        self.set_current(
+            private::Internal,
+            Self::Value::try_from(current).unwrap_or_default(),
+        );
+        Ok(())
     }
 
-    /// Writes to the brightness file containted in /sys/class/backlight/ dir of the respective detected device, which will result in change of brightness if successful and if the chosen device is the correct one.
+    /// Write the given value to the brightness file of the device
+    ///
+    /// **Note: This does not update the current brightness value in the type.
+    /// To update the value, call [`Light::reload`] or [`Light::try_reload`].**
+    ///
     /// # Errors
-    /// - [``BlibError::WriteNewVal``] - on write failure
-    pub fn write_value(&self, value: u32) -> BlResult<()> {
-        if value > self.max {
-            return Err(BlibError::ValueTooLarge {
+    /// - [``ErrorKind::ValueTooLarge``] - if provided value is larger than the supported value
+    /// - [``ErrorKind::WriteValue``] - on write failure
+    fn write_value(&mut self, value: Self::Value) -> Result<()> {
+        let (value, max): (u32, u32) = (value.into(), self.max().into());
+        if value > max {
+            return Err(ErrorKind::ValueTooLarge {
                 given: value,
-                supported: self.max,
-            });
+                supported: max,
+            }
+            .into());
         }
-        let convert = |err| BlibError::WriteNewVal {
-            err,
-            dev: self.name.clone(),
-        };
-        write!(self.open_bl_file().map_err(convert)?, "{value}").map_err(convert)?;
+        let name = self.name().into();
+        let convert = |err| Error::from(ErrorKind::WriteValue { device: name }).with_source(err);
+        let file = self.brightness_file(private::Internal);
+        write!(file, "{value}",).map_err(convert.clone())?;
+        file.rewind().map_err(convert)?;
         Ok(())
     }
 
@@ -267,27 +334,36 @@ impl Device {
     ///
     /// Note: Nothing is written to the brightness file if the provided value is the same as current brightness value or is larger than the max brightness value.
     /// # Example
-    /// ```ignore
+    /// ```no_run
+    /// # use blight::{Device, Light, Delay};
+    /// # fn main() -> blight::Result<()> {
     /// Device::new(None)?
-    ///     .sweep_write(50, Delay::default())?;
+    ///    .sweep_write(50, Delay::default())?;
+    /// # Ok(())
+    /// # }
     /// ```
     /// # Errors
     /// Possible errors that can result from this function include:
-    /// * [``BlibError::SweepError``]
-    pub fn sweep_write(&self, value: u32, delay: Delay) -> Result<(), BlibError> {
-        let mut bfile = self.open_bl_file().map_err(BlibError::SweepError)?;
-        let mut rate = (f64::from(self.max) * 0.01) as u32;
-        let mut current = self.current;
-        let dir = if value > self.current {
+    /// * [``ErrorKind::SweepError``]
+    fn sweep_write(&mut self, value: Self::Value, delay: Delay) -> Result<()>
+    where
+        Self: Dimmable,
+    {
+        let (mut current, value, max): (u32, u32, u32) =
+            (self.current().into(), value.into(), self.max().into());
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+        let mut rate = (f64::from(max) * 0.01) as u32;
+        let dir = if value > current {
             Direction::Inc
         } else {
             Direction::Dec
         };
-
+        let bfile = self.brightness_file(private::Internal);
+        let map_err = |err| Error::from(ErrorKind::SweepError).with_source(err);
         while !(current == value
-            || value > self.max
+            || value > max
             || (current == 0 && dir == Direction::Dec)
-            || (current == self.max && dir == Direction::Inc))
+            || (current == max && dir == Direction::Inc))
         {
             match dir {
                 Direction::Inc => {
@@ -305,31 +381,51 @@ impl Device {
                     current -= rate;
                 }
             }
-            bfile.rewind().map_err(BlibError::SweepError)?;
-            write!(bfile, "{current}").map_err(BlibError::SweepError)?;
+            bfile.rewind().map_err(map_err)?;
+            write!(bfile, "{current}").map_err(map_err)?;
             thread::sleep(*delay);
         }
+        bfile.rewind().map_err(map_err)?;
         Ok(())
     }
 
     /// Calculates the new value to be written to the brightness file based on the provided step-size (percentage) and direction,
-    /// using the current and max values of the detected GPU device. (Always guaranteed to be valid)
+    /// using the current and max values of the backlight/LED device. (Always guaranteed to be valid)
     ///
-    /// For example, if the currecnt value is 10 and max is 100, and you want to increase it by 10% (step_size),
+    /// For example, if the current value is 10 and max is 100, and you want to increase it by 10% (`step_size`),
     /// the method will return 20, which can be directly written to the device.
-    ///
-    pub fn calculate_change(&self, step_size: u32, dir: Direction) -> u32 {
-        let step: u32 = (self.max as f32 * (step_size as f32 / 100.0)) as u32;
-        let change: u32 = match dir {
-            Direction::Inc => self.current.saturating_add(step),
-            Direction::Dec => self.current.saturating_sub(step),
-        };
-
-        if change > self.max {
-            self.max
-        } else {
-            change
+    fn calculate_change(&self, step_size: Self::Value, dir: Direction) -> Self::Value
+    where
+        Self: Dimmable,
+    {
+        let (current, max, step_size): (u32, u32, u32) =
+            (self.current().into(), self.max().into(), step_size.into());
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+        let step: u32 = (f64::from(max) * (f64::from(step_size) / 100.0)) as u32;
+        let change = match dir {
+            Direction::Inc => current.saturating_add(step),
+            Direction::Dec => current.saturating_sub(step),
         }
+        .min(max); // return max if calculated value is > max
+        Self::Value::try_from(change).unwrap_or_default()
+    }
+
+    /// Toggle between `0` and the [`max`](Light::max) brightness value of the device
+    ///
+    /// This method is mainly intended for toggling LEDs on/off.
+    ///
+    /// ## Errors
+    /// - All possible errors that can occur when calling [`Light::write_value`]
+    fn toggle(&mut self) -> Result<()>
+    where
+        Self: Toggleable,
+    {
+        let value = if self.current() == self.max() {
+            Self::Value::default()
+        } else {
+            self.max()
+        };
+        self.write_value(value)
     }
 }
 
@@ -341,14 +437,14 @@ impl Device {
 /// # Errors
 /// Possible errors that can result from this function include:
 /// * All errors that can result from [``Device::new``]
-/// * [``BlibError::WriteNewVal``]
+/// * [``ErrorKind::WriteValue``]
 pub fn change_bl(
     step_size: u32,
     ch: Change,
     dir: Direction,
     device_name: Option<Cow<str>>,
-) -> Result<(), BlibError> {
-    let device = Device::new(device_name)?;
+) -> crate::Result<()> {
+    let mut device = Device::new(device_name)?;
 
     let change = device.calculate_change(step_size, dir);
     if change != device.current {
@@ -365,234 +461,419 @@ pub fn change_bl(
 ///
 /// *Note: Unlike [change_bl], this function does not calculate any change, it writes the given value directly.*
 /// # Examples
-/// ```ignore
+/// ```no_run
+/// # fn main() -> blight::Result<()> {
 /// blight::set_bl(15, None)?;
+/// # Ok(())
+/// # }
 /// ```
-/// ```ignore
+/// ```no_run
+/// # fn main() -> blight::Result<()> {
 /// blight::set_bl(50, Some("nvidia_0".into()))?;
-/// ````
+/// # Ok(())
+/// # }
+/// ```
 /// # Errors
 /// Possible errors that can result from this function include:
 /// * All errors that can result from [``Device::new``]
-/// * [``BlibError::WriteNewVal``]
-/// * [``BlibError::ValueTooLarge``]
-pub fn set_bl(val: u32, device_name: Option<Cow<str>>) -> Result<(), BlibError> {
-    let device = Device::new(device_name)?;
-
+/// * All errors that can result from [`Light::write_value`]
+pub fn set_bl(val: u32, device_name: Option<Cow<str>>) -> Result<()> {
+    let mut device = Device::new(device_name)?;
     if val != device.current {
         device.write_value(val)?;
     }
     Ok(())
 }
 
+mod utils {
+    use super::{Error, ErrorKind, Result};
+    use std::{
+        fs::File,
+        io::{Read, Seek},
+        path::PathBuf,
+    };
+
+    use crate::{CURRENT_FILE, MAX_FILE};
+
+    pub(crate) struct Info {
+        pub(crate) current: u32,
+        pub(crate) max: u32,
+        pub(crate) brightness: File,
+        pub(crate) path: PathBuf,
+    }
+
+    /// Read all the necessary info from the backlight/led interface directory
+    pub(crate) fn read_info(dir: &str, interface: &str) -> Result<Info> {
+        let mut path = construct_path(dir, interface);
+        if !path.is_dir() {
+            return Err(ErrorKind::NotFound.into());
+        }
+        let map_err = |kind| |err| Error::from(kind).with_source(err);
+        // Read max brightness value
+        let max = {
+            let err = map_err(ErrorKind::ReadMax);
+            path.push(MAX_FILE);
+            let mut max_file = File::open(&path).map_err(err.clone())?;
+            read_ascii_u32(&mut max_file).map_err(err)?
+        };
+        // Read current brightness value
+        let (current, brightness) = {
+            let err = map_err(ErrorKind::ReadCurrent);
+            path.set_file_name(CURRENT_FILE);
+            let mut current_file = File::options()
+                .read(true)
+                .write(true)
+                .open(&path)
+                .map_err(err.clone())?;
+            let current = read_ascii_u32(&mut current_file).map_err(err)?;
+            (current, current_file)
+        };
+        // Remove file name so that path points to the parent dir again
+        path.pop();
+        Ok(Info {
+            current,
+            max,
+            brightness,
+            path,
+        })
+    }
+
+    /// Try to read the ASCII contents from the source and convert them into a u32
+    ///
+    /// Note: this function resets the cursor of the source to the start after reading from it.
+    ///
+    /// ## Important
+    /// The implementation assumes that the source contains valid ASCII bytes which may or may not contain
+    /// a newline character at the end and that when converted to an integer, will result in a value that is `0` <= `value` <= `u32::MAX`
+    pub(crate) fn read_ascii_u32<S: Read + Seek>(mut source: S) -> std::io::Result<u32> {
+        let mut buf = [0; 10]; // large enough to hold ASCII string of u32::MAX
+        let read = source.read(&mut buf)?;
+        source.rewind()?;
+        if read == 0 || read > buf.len() {
+            return Err(std::io::Error::other(format!(
+                "read too few or too many bytes: {read} bytes into buf of len {}",
+                buf.len()
+            )));
+        }
+        let mut readi = read - 1;
+        if buf[readi] as char == '\n' {
+            readi -= 1;
+        }
+        #[allow(clippy::cast_possible_truncation)]
+        let (mut value, mut place) = (0, 10u32.pow(readi as _));
+        #[allow(clippy::char_lit_as_u8)]
+        for v in &buf[..=readi] {
+            value += u32::from(v - '0' as u8) * place;
+            place /= 10;
+        }
+        Ok(value)
+    }
+
+    pub(crate) fn construct_path(dir: &str, device_name: &str) -> PathBuf {
+        let mut buf = PathBuf::with_capacity(dir.len() + device_name.len() + 1);
+        buf.push(dir);
+        buf.push(device_name);
+        buf
+    }
+}
+
+// NOTE: tests that read from and write to the disk should not be run in parallel
+// run with `cargo test -- --test-threads 1`
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::error::Error;
-    const TESTDIR: &str = "testbldir";
+    pub(crate) const BLDIR: &str = "testbldir";
+
+    struct MockInterface(utils::Info);
+
+    impl MockInterface {
+        /// Reads from disk, for testing reads and writes
+        fn new(name: &str) -> Self {
+            Self(utils::read_info(BLDIR, name).expect("failed to initialize mock interface"))
+        }
+        /// Dummy instance with specified values that points to an empty temp file
+        ///
+        /// For testing non-IO operations
+        fn dummy(current: u32, max: u32) -> Self {
+            Self(utils::Info {
+                current,
+                max,
+                brightness: File::create("/tmp/dummy.blight").expect("failed to open file"),
+                path: PathBuf::new(),
+            })
+        }
+    }
+
+    impl private::Sealed for MockInterface {}
+    impl Toggleable for MockInterface {}
+    impl Dimmable for MockInterface {}
+    impl Light for MockInterface {
+        type Value = u32;
+
+        fn name(&self) -> &str {
+            self.0.path.file_name().unwrap().to_str().unwrap()
+        }
+
+        fn device_path(&self) -> &Path {
+            &self.0.path
+        }
+
+        fn current(&self) -> Self::Value {
+            self.0.current
+        }
+
+        fn max(&self) -> Self::Value {
+            self.0.max
+        }
+
+        fn set_current(&mut self, _: private::Internal, current: Self::Value) {
+            self.0.current = current;
+        }
+
+        fn brightness_file(&mut self, _: private::Internal) -> &mut File {
+            &mut self.0.brightness
+        }
+    }
+
+    #[test]
+    fn reading_info() {
+        let name = "generic";
+        let test = || {
+            let utils::Info {
+                current, max, path, ..
+            } = utils::read_info(BLDIR, name).expect("failed to read info");
+
+            assert_eq!(current, 50, "incorrect current value");
+            assert_eq!(max, 100, "incorrect max value");
+            assert_eq!(
+                &path,
+                <str as AsRef<Path>>::as_ref(&format!("{BLDIR}/{name}")),
+                "incorrect interface dir path"
+            );
+        };
+        with_test_env(&[name], test);
+    }
+
+    #[test]
+    fn ascii_conversion() {
+        let cases: [(&[u8], u32); 4] = [
+            (b"123\n".as_slice(), 123),
+            (b"999\n".as_slice(), 999),
+            (b"0".as_slice(), 0),
+            (b"4294967295".as_slice(), u32::MAX),
+        ];
+        for (i, (case, expected)) in cases.into_iter().enumerate() {
+            let value = utils::read_ascii_u32(std::io::Cursor::new(case))
+                .expect("failed to convert ASCII bytes to u32");
+            assert_eq!(value, expected, "case {i} failed");
+        }
+    }
 
     #[test]
     fn path_construction() {
         assert_eq!(
-            Device::construct_path(BLDIR, "generic"),
-            PathBuf::from("/sys/class/backlight/generic")
+            utils::construct_path(BLDIR, "generic"),
+            PathBuf::from(&format!("{BLDIR}/generic"))
         );
     }
 
     #[test]
     fn detecting_device_nvidia() {
-        clean_up();
-        setup_test_env(&["nvidia_0", "generic"]).unwrap();
-        let name = Device::detect_device(TESTDIR);
-        assert!(name.is_ok());
-        assert_eq!(name.unwrap(), "nvidia_0");
-        clean_up();
+        let interfaces = ["nvidia_0", "generic"];
+        let test = || {
+            let name = Device::detect_device(BLDIR);
+            assert!(name.is_ok());
+            assert_eq!(name.unwrap(), "nvidia_0");
+        };
+        with_test_env(&interfaces, test);
     }
 
     #[test]
     fn detecting_device_amd() {
-        clean_up();
-        setup_test_env(&["nvidia_0", "generic", "amdgpu_x"]).unwrap();
-        let name = Device::detect_device(TESTDIR);
-        assert!(name.is_ok());
-        assert_eq!(name.unwrap(), "amdgpu_x");
-        clean_up();
+        let interfaces = ["nvidia_0", "generic", "amdgpu_x"];
+        let test = || {
+            let name = Device::detect_device(BLDIR);
+            assert!(name.is_ok());
+            assert_eq!(name.unwrap(), "amdgpu_x");
+        };
+        with_test_env(&interfaces, test);
     }
 
     #[test]
     fn detecting_device_acpi() {
-        clean_up();
-        setup_test_env(&["acpi_video0", "generic"]).unwrap();
-        let name = Device::detect_device(TESTDIR);
-        assert!(name.is_ok());
-        assert_eq!(name.unwrap(), "acpi_video0");
-        clean_up();
+        let interfaces = ["acpi_video0", "generic"];
+        let test = || {
+            let name = Device::detect_device(BLDIR);
+            assert!(name.is_ok());
+            assert_eq!(name.unwrap(), "acpi_video0");
+        };
+        with_test_env(&interfaces, test);
     }
 
     #[test]
     fn detecting_device_fallback() {
-        clean_up();
-        setup_test_env(&["generic"]).unwrap();
-        let name = Device::detect_device(TESTDIR);
-        assert!(name.is_ok());
-        assert_eq!(name.unwrap(), "generic");
-        clean_up();
+        let expected = "generic";
+        let test = || {
+            let name = Device::detect_device(BLDIR);
+            assert!(name.is_ok());
+            assert_eq!(name.unwrap(), expected);
+        };
+        with_test_env(&[expected], test);
     }
 
     #[test]
-    fn writing_value() {
-        clean_up();
+    fn toggle() {
         let name = "generic";
-        setup_test_env(&[name]).unwrap();
-        let d = Device {
-            name: name.to_string(),
-            max: 100,
-            current: 50,
-            path: test_path(name),
+        let test = || {
+            let mut d = MockInterface::new(name);
+            d.write_value(0).expect("failed to write value");
+            d.reload();
+            assert_ne!(d.current(), d.max());
+            d.toggle().expect("failed to toggle on/off");
+            d.reload();
+            assert_eq!(d.current(), d.max());
+            d.toggle().expect("failed to toggle on/off");
+            d.reload();
+            assert_eq!(d.current(), <MockInterface as Light>::Value::default());
         };
-        d.write_value(100).unwrap();
-        let r = fs::read_to_string(format!("{TESTDIR}/generic/brightness"))
-            .expect("failed to read test backlight value");
-        let res = r.trim();
-        assert_eq!("100", res, "Result was {res}");
-        clean_up();
+        with_test_env(&[name], test);
+    }
+
+    #[test]
+    fn reload() {
+        let name = "generic";
+        let test = || {
+            let mut d = MockInterface::new(name);
+            let test_value = 12345;
+            assert_ne!(d.current(), test_value);
+
+            write!(&mut d.0.brightness, "{test_value}")
+                .expect("failed to write value to brightness file");
+            d.0.brightness
+                .rewind()
+                .expect("failed to reset brightness file cursor");
+
+            d.reload();
+            assert_eq!(d.current(), test_value);
+        };
+        with_test_env(&[name], test);
+    }
+
+    #[test]
+    fn write_value() {
+        let name = "generic";
+        let test = || {
+            let mut d = MockInterface::new(name);
+            d.write_value(100).unwrap();
+            let res = fs::read_to_string(format!("{BLDIR}/generic/brightness"))
+                .expect("failed to read test backlight value");
+            assert_eq!(res.trim(), "100", "Result was {res}");
+        };
+        with_test_env(&[name], test);
     }
 
     #[test]
     fn read_value() {
-        clean_up();
         let name = "generic";
-        setup_test_env(&[name]).unwrap();
-        assert_eq!(50, Device::read_value(test_path(name)).unwrap());
-        clean_up();
-    }
-
-    #[test]
-    fn current_value() {
-        clean_up();
-        let name = "generic";
-        setup_test_env(&[name]).unwrap();
-        let current = Device::read_value(test_path(name)).unwrap();
-        assert_eq!(current, 50);
-        clean_up();
+        let test = || {
+            let (_, mut file) = open_current_file(name);
+            assert_eq!(50, utils::read_ascii_u32(&mut file).unwrap());
+        };
+        with_test_env(&[name], test);
     }
 
     #[test]
     fn current_percent() {
-        let device = Device {
-            name: "".into(),
-            current: 5,
-            max: 255,
-            path: test_path(""),
-        };
-        assert_eq!(device.current_percent().round(), 2.0);
+        let percent = MockInterface::dummy(5, 255).current_percent().round();
+        assert_eq!(percent, 2.0);
     }
 
     #[test]
     fn inc_calculation() {
-        let d = Device {
-            name: String::new(),
-            current: 10,
-            max: 100,
-            path: test_path(""),
-        };
+        let d = MockInterface::dummy(10, 100);
         let ch = d.calculate_change(10, Direction::Inc);
         assert_eq!(ch, 20);
     }
 
     #[test]
     fn dec_calculation() {
-        let d = Device {
-            name: String::new(),
-            current: 30,
-            max: 100,
-            path: test_path(""),
-        };
+        let d = MockInterface::dummy(30, 100);
         let ch = d.calculate_change(10, Direction::Dec);
         assert_eq!(ch, 20);
     }
 
     #[test]
     fn inc_calculation_max() {
-        let d = Device {
-            name: String::new(),
-            current: 90,
-            max: 100,
-            path: test_path(""),
-        };
+        let d = MockInterface::dummy(90, 100);
         let ch = d.calculate_change(20, Direction::Inc);
         assert_eq!(ch, 100);
     }
 
     #[test]
     fn dec_calculation_max() {
-        let d = Device {
-            name: String::new(),
-            current: 10,
-            max: 100,
-            path: test_path(""),
-        };
+        let d = MockInterface::dummy(10, 100);
         let ch = d.calculate_change(20, Direction::Dec);
         assert_eq!(ch, 0);
     }
 
     #[test]
     fn sweeping() {
-        clean_up();
-        setup_test_env(&["generic"]).unwrap();
-        let mut d = test_device("generic");
-        d.sweep_write(100, Delay::default()).unwrap();
-        d.reload();
-        assert_eq!(d.current, 100);
-        d.sweep_write(0, Delay::default()).unwrap();
-        d.reload();
-        assert_eq!(d.current, 0);
-        clean_up();
+        let name = "generic";
+        let test = || {
+            let mut d = MockInterface::new(name);
+            d.sweep_write(100, Delay::default()).unwrap();
+            d.reload();
+            assert_eq!(d.current(), 100);
+            d.sweep_write(0, Delay::default()).unwrap();
+            d.reload();
+            assert_eq!(d.current(), 0);
+        };
+        with_test_env(&[name], test);
     }
 
     #[test]
     fn sweep_bounds() {
+        let name = "generic";
+        let test = || {
+            let mut d = MockInterface::new(name);
+            d.write_value(0).unwrap();
+            d.sweep_write(u32::MAX, Delay::default()).unwrap();
+            d.reload();
+            assert_eq!(d.current(), 0);
+        };
+        with_test_env(&[name], test);
+    }
+
+    pub(crate) fn with_test_env(dirs: &[&str], test: impl FnOnce()) {
         clean_up();
-        setup_test_env(&["generic"]).unwrap();
-        let mut d = test_device("generic");
-        d.write_value(0).unwrap();
-        d.sweep_write(u32::MAX, Delay::default()).unwrap();
-        d.reload();
-        assert_eq!(d.current, 0);
+        setup_test_env(dirs, 50, 100);
+        test();
         clean_up();
     }
 
-    fn setup_test_env(dirs: &[&str]) -> Result<(), Box<dyn Error>> {
-        fs::create_dir(TESTDIR)?;
-        for dir in dirs {
-            fs::create_dir(format!("{TESTDIR}/{dir}"))?;
-            fs::write(format!("{TESTDIR}/{dir}/brightness"), "50")?;
-            fs::write(format!("{TESTDIR}/{dir}/max_brightness"), "100")?;
-        }
-        Ok(())
+    pub(crate) fn setup_test_env(dirs: &[&str], current: u32, max: u32) {
+        let inner = || -> std::io::Result<()> {
+            fs::create_dir(BLDIR)?;
+            for dir in dirs {
+                fs::create_dir(format!("{BLDIR}/{dir}"))?;
+                fs::write(format!("{BLDIR}/{dir}/brightness"), current.to_string())?;
+                fs::write(format!("{BLDIR}/{dir}/max_brightness"), max.to_string())?;
+            }
+            Ok(())
+        };
+        inner().expect("failed to set up test env");
     }
 
-    fn test_device(name: &str) -> Device {
-        Device {
-            name: name.into(),
-            current: 50,
-            max: 100,
-            path: test_path(name),
-        }
-    }
-
-    fn test_path(name: &str) -> PathBuf {
-        let mut path = Device::construct_path(TESTDIR, name);
+    fn open_current_file(name: &str) -> (PathBuf, File) {
+        let mut path = utils::construct_path(BLDIR, name);
         path.push(CURRENT_FILE);
-        path
+        let file = File::open(&path).expect("failed to open test current brightness file");
+        (path, file)
     }
 
-    fn clean_up() {
-        if fs::read_dir(".")
-            .unwrap()
-            .any(|dir| dir.unwrap().file_name().as_os_str() == "testbldir")
-        {
-            fs::remove_dir_all(TESTDIR).expect("Failed to clean up testing backlight directory.");
+    pub(crate) fn clean_up() {
+        if <str as AsRef<Path>>::as_ref(BLDIR).is_dir() {
+            fs::remove_dir_all(BLDIR).expect("Failed to clean up testing backlight directory.");
         }
     }
 }

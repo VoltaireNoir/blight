@@ -1,8 +1,7 @@
 use blight::{
-    err::{BlibError, Tip},
     Change, Device,
     Direction::{self, Dec, Inc},
-    BLDIR,
+    Light, BLDIR,
 };
 use colored::Colorize;
 use fs4::FileExt;
@@ -10,7 +9,6 @@ use std::{
     borrow::Cow,
     env,
     env::Args,
-    error::Error,
     fs::{self, File, OpenOptions},
     iter::Skip,
     path::PathBuf,
@@ -21,7 +19,7 @@ mod setup;
 const SAVEDIR: &str = "/.local/share/blight";
 const LOCKFILE: &str = "/tmp/blight.lock";
 
-type DynError = Box<dyn Error + 'static>;
+type DynError = Box<dyn std::error::Error + 'static>;
 
 pub struct Config<'a> {
     command: Command,
@@ -137,6 +135,10 @@ pub fn execute(conf: Config) -> Result<SuccessMessage, DynError> {
     Ok(gen_success_msg(&conf.command))
 }
 
+trait Tip: std::error::Error + 'static {
+    fn tip(&self) -> Option<Cow<'static, str>>;
+}
+
 #[derive(Debug)]
 pub enum BlightError {
     UnrecognisedCommand,
@@ -187,12 +189,33 @@ impl std::fmt::Display for BlightError {
     }
 }
 
-impl Error for BlightError {}
+impl std::error::Error for BlightError {}
+
+impl Tip for blight::Error {
+    fn tip(&self) -> Option<Cow<'static, str>> {
+        use blight::ErrorKind::WriteValue;
+        match self.kind() {
+            WriteValue { device } => {
+                let tip_msg = format!(
+                    "{main} '{dir}/{device}/brightness'\n{extra}",
+                    main = "make sure you have write permission to the file",
+                    dir = blight::BLDIR,
+                    extra = "
+Run `sudo blight setup` to install necessarry udev rules and add user to video group.
+or visit https://wiki.archlinux.org/title/Backlight#Hardware_interfaces
+if you'd like to do it manually.",
+                );
+                Some(tip_msg.into())
+            }
+            _ => None,
+        }
+    }
+}
 
 pub fn print_err(e: DynError) {
     eprintln!("{} {e}", "Error".red().bold());
     if let Some(tip) = e
-        .downcast_ref::<BlibError>()
+        .downcast_ref::<blight::Error>()
         .and_then(|e| e.tip())
         .or(e.downcast_ref::<BlightError>().and_then(|e| e.tip()))
     {
@@ -224,7 +247,7 @@ fn check_write_perm(device_name: &str, bldir: &str) -> Result<(), std::io::Error
         .and(Ok(()))
 }
 
-pub fn print_status(device_name: Option<Cow<str>>) -> Result<(), BlibError> {
+pub fn print_status(device_name: Option<Cow<str>>) -> blight::Result<()> {
     let device = Device::new(device_name)?;
 
     let write_perm = match check_write_perm(device.name(), BLDIR) {
@@ -341,7 +364,7 @@ pub fn restore() -> Result<(), DynError> {
     };
 
     let (device_name, val) = restore.split_once(' ').unwrap();
-    let device = Device::new(Some(device_name.into()))?;
+    let mut device = Device::new(Some(device_name.into()))?;
 
     let value: u32 = val.parse().map_err(|_| BlightError::SaveParseErr)?;
     device.write_value(value)?;
