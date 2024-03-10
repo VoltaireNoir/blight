@@ -125,11 +125,11 @@ pub fn execute(conf: Config) -> Result<SuccessMessage, DynError> {
         Save => save(conf.options.device)?,
         Restore => restore()?,
         Set(v) => {
-            let _lock = acquire_lock();
+            let _lock = acquire_lock()?;
             blight::set_bl(v, conf.options.device)?
         }
         Adjust { dir, value } => {
-            let _lock = acquire_lock();
+            let _lock = acquire_lock()?;
             blight::change_bl(value, conf.options.sweep, dir, conf.options.device)?
         }
     };
@@ -147,6 +147,7 @@ pub enum BlightError {
     ReadFromSave(std::io::Error),
     NoSaveFound,
     SaveParseErr,
+    LockFailure(std::io::Error),
 }
 
 impl Tip for BlightError {
@@ -161,6 +162,9 @@ impl Tip for BlightError {
             }
             ReadFromSave(_) => Some("make sure you have read permission for the save file".into()),
             SaveParseErr => Some("delete the save file and try save-restore again".into()),
+            LockFailure(_) => {
+                Some(format!("try manually removing the lock file: `{LOCKFILE}`").into())
+            }
             _ => None,
         }
     }
@@ -178,6 +182,7 @@ impl std::fmt::Display for BlightError {
             ReadFromSave(err) => write!(f, "failed to read from save file\n{err}"),
             NoSaveFound => write!(f, "no save file found"),
             SaveParseErr => write!(f, "failed to parse saved brightness value"),
+            LockFailure(err) => write!(f, "failed to acquire lock\n{err}"),
         }
     }
 }
@@ -370,20 +375,20 @@ impl PanicReporter {
     }
 }
 
-fn acquire_lock() -> File {
+fn acquire_lock() -> Result<File, DynError> {
     let file = OpenOptions::new()
         .write(true)
         .create(true)
         .open(LOCKFILE)
-        .expect("failed to open lock file");
+        .map_err(BlightError::LockFailure)?;
     if file.try_lock_exclusive().is_ok() {
-        return file;
+        return Ok(file);
     }
     println!(
         "{} {}",
         "Status".magenta().bold(),
         "Waiting for another instance to finish"
     );
-    file.lock_exclusive().expect("failed to acquire lock");
-    file
+    file.lock_exclusive().map_err(BlightError::LockFailure)?;
+    Ok(file)
 }
