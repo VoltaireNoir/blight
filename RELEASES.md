@@ -1,3 +1,12 @@
+# Version 0.7.1
+
+### Summary
+A minor bug fix release that changes the behavior of how errors are handled while acquiring a lock.
+Note: This release only contains changes to the CLI.
+
+### Fixed
+- Handle errors while acquiring a lock instead of panicking (#9)
+
 # Version 0.7.0
 
 ### Summary

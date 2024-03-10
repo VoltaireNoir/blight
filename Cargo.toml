@@ -6,7 +6,7 @@ keywords = ["backlight", "CLI", "utility", "hybrid-gpu", "brightness"]
 authors = ["Maaz Ahmed <mzahmed95@gmail.com>"]
 repository = "https://github.com/VoltaireNoir/blight"
 license = "MIT"
-version = "0.7.0"
+version = "0.7.1"
 edition = "2021"
 exclude = ["*.png", ".github/workflows"]
 
