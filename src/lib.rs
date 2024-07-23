@@ -48,6 +48,7 @@ use std::{
 };
 
 pub mod err;
+pub mod led;
 pub use err::BlResult;
 
 /// Linux backlight directory location. All backlight hardware devices appear here.
