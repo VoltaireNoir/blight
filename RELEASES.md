@@ -1,3 +1,25 @@
+# Version 0.8.0 (unreleased)
+
+### Added
+- library support for LED interface (`/sys/class/leds`) 🎉
+- `toggle` method to toggle between min and max supported brightness values
+  - Mainly intended to be used for LEDs, but is also available on the `Device` type
+
+### Improved
+- Better and cleaner implementation of the code that reads brightness values from ASCII text
+- Improved code examples in the inline documentation
+- All doc tests are set to `no_run` instead of `ignore`, to ensure all doc examples compile
+
+### Changed
+- [BREAKING!] `Device` is now required to be mutable to call any methods that change the brightness value, since the struct now internally holds the opened brightness file.
+- [BREAKING!] `Error` type which was previously an enum, is now a struct.
+  - To distinguish between different error types, use `Error::kind` to access the `ErrorKind` enum.
+  - To acess the source of the error, use `Error::source` 
+- [BREAKING!] Core functionality provided on the `Device` type is now made available through the `Light` trait, which is also shared with `Led`
+- [BREAKING!] `device_path` method now returns a `&Path` instead of a `PathBuf`
+- `blight::Result` is now the preferred type alias for the result type, not `blight::BlResult`
+ - The old type alias is still included
+
 # Version 0.7.1
 
 ### Summary

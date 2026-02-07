@@ -18,7 +18,7 @@ Primarily, a hassle-free CLI utility to manage backlight on Linux; one that play
 The parts which blight relies on to make backlight changes, are also exposed through the library aspect of this crate, which can be used like any other Rust library by using the command `cargo add blight` in your Rust project. The CLI utility, on the other hand, can be installed by running `cargo install blight`.
 
 > **Note**
-> This page contains documentation for the CLI. For library docs, visit [docs.rs](https://docs.rs/blight/).
+> This page contains documentation for the CLI. For library docs, visit [docs.rs](https://docs.rs/blight/). The latest version of the library now also supports LEDs.
 
 > **Warning**
 > For this program to run without root privileges, the user needs to be in the video group and might need udev rules to allow write access to brightness files. Read more about it [here](https://wiki.archlinux.org/title/Backlight#ACPI). You can gain required permissions by using the helper script that comes with blight by running `sudo blight setup` once or you could do it manually too. If not, you'd have to run the program with `sudo` every time.

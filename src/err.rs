@@ -1,72 +1,96 @@
-//! All blight library related errors in one place. See [BlibError]
+//! All blight library related errors in one place. See [`Error`] and [`ErrorKind`]
 
-use std::{borrow::Cow, error::Error};
+use std::fmt::Display;
 
-pub type BlResult<T> = Result<T, BlibError>;
-/// All blight library related errors in one place. Every time one of the functions or methods of the library return an error, it'll always be one of this enum's variants.
-/// Some variants wrap additional error information and all of them have their separate Display trait implementations, containing a simple description of the error and possibly
-/// a tip to help the user fix it.
+/// Result type alias with blight [`Error`] as the default error type
+///
+/// This type alias is the same as [`Result`] provided in this module, which is now the preferred alias.
+pub type BlResult<T> = Result<T>;
+
+/// Result type alias with blight [`Error`] as the default error type
+pub type Result<T> = std::result::Result<T, Error>;
+
+/// Error type containing possible error source and the [`ErrorKind`]
+///
+/// Use [`Error::kind`] to distinguish between different types of errors.
+/// Use [`std::error::Error::source`] to get the error source (if it is present).
 #[derive(Debug)]
-pub enum BlibError {
-    ReadBlDir(std::io::Error),
-    NoDeviceFound,
-    WriteNewVal { err: std::io::Error, dev: String },
-    ReadMax,
-    ReadCurrent,
-    SweepError(std::io::Error),
-    ValueTooLarge { given: u32, supported: u32 },
+pub struct Error {
+    kind: ErrorKind,
+    source: Option<std::io::Error>,
 }
 
-#[doc(hidden)]
-pub trait Tip: Error + 'static {
-    fn tip(&self) -> Option<Cow<'static, str>>;
+impl Error {
+    pub(crate) fn with_source(mut self, source: std::io::Error) -> Self {
+        self.source.replace(source);
+        self
+    }
+
+    /// Get the [`ErrorKind`] to distinguish between different error types
+    pub fn kind(&self) -> &ErrorKind {
+        &self.kind
+    }
 }
 
-impl Tip for BlibError {
-    fn tip(&self) -> Option<Cow<'static, str>> {
-        use BlibError::WriteNewVal;
-        match &self {
-            WriteNewVal { dev, .. } => {
-                let tip_msg = format!(
-                    "{main} '{dir}/{dev}/brightness'\n{extra}",
-                    main = "make sure you have write permission to the file",
-                    dir = super::BLDIR,
-                    extra = "
-Run `sudo blight setup` to install necessarry udev rules and add user to video group.
-or visit https://wiki.archlinux.org/title/Backlight#Hardware_interfaces
-if you'd like to do it manually.",
-                );
-                Some(tip_msg.into())
-            }
-            _ => None,
+impl From<ErrorKind> for Error {
+    fn from(value: ErrorKind) -> Self {
+        Self {
+            kind: value,
+            source: None,
         }
     }
 }
 
-impl std::fmt::Display for BlibError {
+impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use BlibError::*;
+        self.kind.fmt(f)?;
+        if let Some(s) = &self.source {
+            write!(f, " (source: {s})")?;
+        }
+        Ok(())
+    }
+}
+
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        self.source.as_ref().map(|e| e as _)
+    }
+}
+
+/// Different kinds of possible errors
+///
+/// The `Display` trait impl provides human-friendly, descriptive messages for each variant.
+#[derive(Debug, Clone)]
+pub enum ErrorKind {
+    ReadDir { dir: &'static str },
+    ReadMax,
+    ReadCurrent,
+    WriteValue { device: String },
+    ValueTooLarge { given: u32, supported: u32 },
+    SweepError,
+    NotFound,
+}
+
+impl std::fmt::Display for ErrorKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ReadBlDir(e) => write!(f, "failed to read {} directory\n{e}", super::BLDIR),
-
-            NoDeviceFound => write!(f, "no known backlight device detected"),
-
-            WriteNewVal { err, .. } => {
-                write!(f, "failed to write to the brightness file ({err})",)
+            ErrorKind::ReadDir { dir } => write!(f, "failed to read {dir} directory",),
+            ErrorKind::NotFound => write!(f, "no known backlight or LED device detected"),
+            ErrorKind::WriteValue { device } => {
+                write!(
+                    f,
+                    "failed to write to the brightness file of device '{device}'",
+                )
             }
-
-            ReadCurrent => write!(f, "failed to read current brightness value"),
-
-            ReadMax => write!(f, "failed to read max brightness value"),
-
-            SweepError(err) => write!(f, "failed to sweep write to brightness file ({err})"),
-
-            ValueTooLarge { given, supported } => write!(
+            ErrorKind::ReadCurrent => write!(f, "failed to read current brightness value"),
+            ErrorKind::ReadMax => write!(f, "failed to read max brightness value"),
+            ErrorKind::SweepError => {
+                write!(f, "failed to perform a sweep-write on the brightness file")
+            }
+            ErrorKind::ValueTooLarge { given, supported } => write!(
                 f,
-                "provided value ({given}) is larger than the max supported value of {supported}"
+                "provided value '{given}' is larger than the max supported value of '{supported}'"
             ),
         }
     }
 }
-
-impl std::error::Error for BlibError {}
