@@ -352,6 +352,13 @@ pub trait Light: private::Sealed {
     {
         let (mut current, val, max): (u32, u32, u32) =
             (self.current().into(), value.into(), self.max().into());
+        if val > max {
+            return Err(ErrorKind::ValueTooLarge {
+                given: val,
+                supported: max,
+            }
+            .into());
+        }
         #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
         let mut rate = (f64::from(max) * 0.01) as u32;
         let dir = if val > current {
@@ -361,11 +368,7 @@ pub trait Light: private::Sealed {
         };
         let bfile = self.brightness_file(private::Internal);
         let map_err = |err| Error::from(ErrorKind::SweepError).with_source(err);
-        while !(current == val
-            || val > max
-            || (current == 0 && dir == Direction::Dec)
-            || (current == max && dir == Direction::Inc))
-        {
+        while current != val {
             match dir {
                 Direction::Inc => {
                     if (current + rate) > val {
@@ -839,7 +842,14 @@ mod tests {
         let test = || {
             let mut d = MockInterface::new(name);
             d.write_value(0).unwrap();
-            d.sweep_write(u32::MAX, Delay::default()).unwrap();
+            let err = d.sweep_write(u32::MAX, Delay::default());
+            assert_eq!(
+                err.unwrap_err().kind(),
+                &ErrorKind::ValueTooLarge {
+                    given: u32::MAX,
+                    supported: d.max()
+                }
+            );
             d.reload();
             assert_eq!(d.current(), 0);
         };

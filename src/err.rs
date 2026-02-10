@@ -60,7 +60,7 @@ impl std::error::Error for Error {
 /// Different kinds of possible errors
 ///
 /// The `Display` trait impl provides human-friendly, descriptive messages for each variant.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ErrorKind {
     ReadDir { dir: &'static str },
     ReadMax,
