@@ -31,7 +31,7 @@
 //!     let mut dev = Device::new(None)?;
 //!     let new = dev.calculate_change(5, Direction::Dec); // safely calculate value to write
 //!     dev.write_value(new)?; // decreases brightness by 5%
-//!     dev.reload(); // reloads current brightness value (important)
+//!     dev.reload(); // reloads current brightness value from the brightness file (optional)
 //!     let new = dev.calculate_change(5, Direction::Inc);
 //!     dev.sweep_write(new, Delay::default()); // smoothly increases brightness by 5%
 //!     Ok(())
@@ -130,7 +130,7 @@ impl Delay {
 ///     bl.max()
 ///   );
 ///   bl.write_value(50)?;
-///   bl.try_reload()?;
+///   bl.try_reload()?; // Optional
 ///   Ok(())
 /// }
 /// ```
@@ -278,7 +278,7 @@ pub trait Light: private::Sealed {
         (f64::from(current) / f64::from(max)) * 100.
     }
 
-    /// Reloads current brightness value for the device
+    /// Reloads current brightness value for the device by reading the brightness file
     ///
     /// Use the fallible [`Light::try_reload`] method if you want to handle the error and avoid causing panic at runtime.
     ///
@@ -289,7 +289,7 @@ pub trait Light: private::Sealed {
             .expect("Failed to read current brightness value");
     }
 
-    /// Reloads current brightness value for the device
+    /// Reloads current brightness value for the device by reading the brightness file
     fn try_reload(&mut self) -> Result<()> {
         let current = utils::read_ascii_u32(self.brightness_file(private::Internal))
             .map_err(|err| Error::from(ErrorKind::ReadCurrent).with_source(err))?;
@@ -302,8 +302,10 @@ pub trait Light: private::Sealed {
 
     /// Write the given value to the brightness file of the device
     ///
-    /// **Note: This does not update the current brightness value in the type.
-    /// To update the value, call [`Light::reload`] or [`Light::try_reload`].**
+    /// **Note: this method updates the `current` brightness value in `self` to the final
+    /// value that was successfully written to the brightness file. If there is a chance that the brightness
+    /// file was modified by some other process after this function was called, consider force reloading the
+    /// `current` brightness value by calling [`Light::reload`] or [`Light::try_reload`].**
     ///
     /// # Errors
     /// - [``ErrorKind::ValueTooLarge``] - if provided value is larger than the supported value
@@ -333,7 +335,13 @@ pub trait Light: private::Sealed {
     /// The delay between each iteration of the loop can be set using the [``Delay``] type, or the default can be used by calling [``Delay::default()``],
     /// which sets the delay of 25ms/iter (recommended).
     ///
-    /// Note: Nothing is written to the brightness file if the provided value is the same as current brightness value or is larger than the max brightness value.
+    /// No file writes are performed and `Ok(())` is returned if `value` == `self.current()`
+    ///
+    /// **Note: this method updates the `current` brightness value in `self` to the final
+    /// value that was successfully written to the brightness file. If there is a chance that the brightness
+    /// file was modified by some other process after this function was called, consider force reloading the
+    /// `current` brightness value by calling [`Light::reload`] or [`Light::try_reload`].**
+    ///
     /// # Example
     /// ```no_run
     /// # use blight::{Device, Light, Delay};
