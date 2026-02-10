@@ -250,7 +250,7 @@ pub trait Toggleable: private::Sealed {}
 
 /// The interface for controlling both backlight and LED devices
 pub trait Light: private::Sealed {
-    type Value: Into<u32> + TryFrom<u32> + PartialEq + Default;
+    type Value: Into<u32> + TryFrom<u32> + PartialEq + Copy + Default;
 
     /// Name of the backlight/LED device
     fn name(&self) -> &str;
@@ -309,10 +309,10 @@ pub trait Light: private::Sealed {
     /// - [``ErrorKind::ValueTooLarge``] - if provided value is larger than the supported value
     /// - [``ErrorKind::WriteValue``] - on write failure
     fn write_value(&mut self, value: Self::Value) -> Result<()> {
-        let (value, max): (u32, u32) = (value.into(), self.max().into());
-        if value > max {
+        let (val, max): (u32, u32) = (value.into(), self.max().into());
+        if val > max {
             return Err(ErrorKind::ValueTooLarge {
-                given: value,
+                given: val,
                 supported: max,
             }
             .into());
@@ -320,8 +320,9 @@ pub trait Light: private::Sealed {
         let name = self.name().into();
         let convert = |err| Error::from(ErrorKind::WriteValue { device: name }).with_source(err);
         let file = self.brightness_file(private::Internal);
-        write!(file, "{value}",).map_err(convert.clone())?;
+        write!(file, "{val}",).map_err(convert.clone())?;
         file.rewind().map_err(convert)?;
+        self.set_current(private::Internal, value);
         Ok(())
     }
 
@@ -349,34 +350,34 @@ pub trait Light: private::Sealed {
     where
         Self: Dimmable,
     {
-        let (mut current, value, max): (u32, u32, u32) =
+        let (mut current, val, max): (u32, u32, u32) =
             (self.current().into(), value.into(), self.max().into());
         #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
         let mut rate = (f64::from(max) * 0.01) as u32;
-        let dir = if value > current {
+        let dir = if val > current {
             Direction::Inc
         } else {
             Direction::Dec
         };
         let bfile = self.brightness_file(private::Internal);
         let map_err = |err| Error::from(ErrorKind::SweepError).with_source(err);
-        while !(current == value
-            || value > max
+        while !(current == val
+            || val > max
             || (current == 0 && dir == Direction::Dec)
             || (current == max && dir == Direction::Inc))
         {
             match dir {
                 Direction::Inc => {
-                    if (current + rate) > value {
-                        rate = value - current;
+                    if (current + rate) > val {
+                        rate = val - current;
                     }
                     current += rate;
                 }
                 Direction::Dec => {
                     if rate > current {
                         rate = current;
-                    } else if (current - rate) < value {
-                        rate = current - value;
+                    } else if (current - rate) < val {
+                        rate = current - val;
                     }
                     current -= rate;
                 }
@@ -386,6 +387,7 @@ pub trait Light: private::Sealed {
             thread::sleep(*delay);
         }
         bfile.rewind().map_err(map_err)?;
+        self.set_current(private::Internal, value);
         Ok(())
     }
 
