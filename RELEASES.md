@@ -9,8 +9,11 @@
 - Better and cleaner implementation of the code that reads brightness values from ASCII text
 - Improved code examples in the inline documentation
 - All doc tests are set to `no_run` instead of `ignore`, to ensure all doc examples compile
+- All successful write operations update the `current` brightness value in `self`
+  - This makes calling `reload` after a write optional and is required only if brightness values were modified by an external process
 
 ### Changed
+- [BREAKING!] `sweep_write` returns `ErrorKind::ValueTooLarge` if the provided value is larger than `max` (same as `write_value`) instead of silently ignoring it
 - [BREAKING!] `Device` is now required to be mutable to call any methods that change the brightness value, since the struct now internally holds the opened brightness file.
 - [BREAKING!] `Error` type which was previously an enum, is now a struct.
   - To distinguish between different error types, use `Error::kind` to access the `ErrorKind` enum.

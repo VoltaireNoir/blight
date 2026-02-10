@@ -31,7 +31,7 @@
 //!     let mut dev = Device::new(None)?;
 //!     let new = dev.calculate_change(5, Direction::Dec); // safely calculate value to write
 //!     dev.write_value(new)?; // decreases brightness by 5%
-//!     dev.reload(); // reloads current brightness value (important)
+//!     dev.reload(); // reloads current brightness value from the brightness file (optional)
 //!     let new = dev.calculate_change(5, Direction::Inc);
 //!     dev.sweep_write(new, Delay::default()); // smoothly increases brightness by 5%
 //!     Ok(())
@@ -130,7 +130,7 @@ impl Delay {
 ///     bl.max()
 ///   );
 ///   bl.write_value(50)?;
-///   bl.try_reload()?;
+///   bl.try_reload()?; // Optional
 ///   Ok(())
 /// }
 /// ```
@@ -250,7 +250,7 @@ pub trait Toggleable: private::Sealed {}
 
 /// The interface for controlling both backlight and LED devices
 pub trait Light: private::Sealed {
-    type Value: Into<u32> + TryFrom<u32> + PartialEq + Default;
+    type Value: Into<u32> + TryFrom<u32> + PartialEq + Copy + Default;
 
     /// Name of the backlight/LED device
     fn name(&self) -> &str;
@@ -278,7 +278,7 @@ pub trait Light: private::Sealed {
         (f64::from(current) / f64::from(max)) * 100.
     }
 
-    /// Reloads current brightness value for the device
+    /// Reloads current brightness value for the device by reading the brightness file
     ///
     /// Use the fallible [`Light::try_reload`] method if you want to handle the error and avoid causing panic at runtime.
     ///
@@ -289,7 +289,7 @@ pub trait Light: private::Sealed {
             .expect("Failed to read current brightness value");
     }
 
-    /// Reloads current brightness value for the device
+    /// Reloads current brightness value for the device by reading the brightness file
     fn try_reload(&mut self) -> Result<()> {
         let current = utils::read_ascii_u32(self.brightness_file(private::Internal))
             .map_err(|err| Error::from(ErrorKind::ReadCurrent).with_source(err))?;
@@ -302,17 +302,19 @@ pub trait Light: private::Sealed {
 
     /// Write the given value to the brightness file of the device
     ///
-    /// **Note: This does not update the current brightness value in the type.
-    /// To update the value, call [`Light::reload`] or [`Light::try_reload`].**
+    /// **Note: this method updates the `current` brightness value in `self` to the final
+    /// value that was successfully written to the brightness file. If there is a chance that the brightness
+    /// file was modified by some other process after this function was called, consider force reloading the
+    /// `current` brightness value by calling [`Light::reload`] or [`Light::try_reload`].**
     ///
     /// # Errors
     /// - [``ErrorKind::ValueTooLarge``] - if provided value is larger than the supported value
     /// - [``ErrorKind::WriteValue``] - on write failure
     fn write_value(&mut self, value: Self::Value) -> Result<()> {
-        let (value, max): (u32, u32) = (value.into(), self.max().into());
-        if value > max {
+        let (val, max): (u32, u32) = (value.into(), self.max().into());
+        if val > max {
             return Err(ErrorKind::ValueTooLarge {
-                given: value,
+                given: val,
                 supported: max,
             }
             .into());
@@ -320,8 +322,9 @@ pub trait Light: private::Sealed {
         let name = self.name().into();
         let convert = |err| Error::from(ErrorKind::WriteValue { device: name }).with_source(err);
         let file = self.brightness_file(private::Internal);
-        write!(file, "{value}",).map_err(convert.clone())?;
+        write!(file, "{val}",).map_err(convert.clone())?;
         file.rewind().map_err(convert)?;
+        self.set_current(private::Internal, value);
         Ok(())
     }
 
@@ -332,7 +335,13 @@ pub trait Light: private::Sealed {
     /// The delay between each iteration of the loop can be set using the [``Delay``] type, or the default can be used by calling [``Delay::default()``],
     /// which sets the delay of 25ms/iter (recommended).
     ///
-    /// Note: Nothing is written to the brightness file if the provided value is the same as current brightness value or is larger than the max brightness value.
+    /// No file writes are performed and `Ok(())` is returned if `value` == `self.current()`
+    ///
+    /// **Note: this method updates the `current` brightness value in `self` to the final
+    /// value that was successfully written to the brightness file. If there is a chance that the brightness
+    /// file was modified by some other process after this function was called, consider force reloading the
+    /// `current` brightness value by calling [`Light::reload`] or [`Light::try_reload`].**
+    ///
     /// # Example
     /// ```no_run
     /// # use blight::{Device, Light, Delay};
@@ -349,34 +358,37 @@ pub trait Light: private::Sealed {
     where
         Self: Dimmable,
     {
-        let (mut current, value, max): (u32, u32, u32) =
+        let (mut current, val, max): (u32, u32, u32) =
             (self.current().into(), value.into(), self.max().into());
+        if val > max {
+            return Err(ErrorKind::ValueTooLarge {
+                given: val,
+                supported: max,
+            }
+            .into());
+        }
         #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
         let mut rate = (f64::from(max) * 0.01) as u32;
-        let dir = if value > current {
+        let dir = if val > current {
             Direction::Inc
         } else {
             Direction::Dec
         };
         let bfile = self.brightness_file(private::Internal);
         let map_err = |err| Error::from(ErrorKind::SweepError).with_source(err);
-        while !(current == value
-            || value > max
-            || (current == 0 && dir == Direction::Dec)
-            || (current == max && dir == Direction::Inc))
-        {
+        while current != val {
             match dir {
                 Direction::Inc => {
-                    if (current + rate) > value {
-                        rate = value - current;
+                    if (current + rate) > val {
+                        rate = val - current;
                     }
                     current += rate;
                 }
                 Direction::Dec => {
                     if rate > current {
                         rate = current;
-                    } else if (current - rate) < value {
-                        rate = current - value;
+                    } else if (current - rate) < val {
+                        rate = current - val;
                     }
                     current -= rate;
                 }
@@ -386,6 +398,7 @@ pub trait Light: private::Sealed {
             thread::sleep(*delay);
         }
         bfile.rewind().map_err(map_err)?;
+        self.set_current(private::Internal, value);
         Ok(())
     }
 
@@ -837,7 +850,14 @@ mod tests {
         let test = || {
             let mut d = MockInterface::new(name);
             d.write_value(0).unwrap();
-            d.sweep_write(u32::MAX, Delay::default()).unwrap();
+            let err = d.sweep_write(u32::MAX, Delay::default());
+            assert_eq!(
+                err.unwrap_err().kind(),
+                &ErrorKind::ValueTooLarge {
+                    given: u32::MAX,
+                    supported: d.max()
+                }
+            );
             d.reload();
             assert_eq!(d.current(), 0);
         };
