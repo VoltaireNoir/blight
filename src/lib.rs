@@ -2,7 +2,7 @@
 //! # About
 //! blight is primarily a CLI backlight utility for Linux which is focused on providing hassle-free backlight control.
 //! However, the parts which blight relies on to make backlight changes, are also exposed through the library aspect of this crate, which can be used like any other Rust library
-//! by using the command `cargo add blight` in your Rust project. The CLI utility, on the other hand, can be installed by running `cargo install blight`.
+//! by using the command `cargo add blight --no-default-features` in your Rust project. The CLI utility, on the other hand, can be installed by running `cargo install blight`.
 //! This documentation only covers the library aspect, for CLI related docs, visit the project's [Github repo](https://github.com/voltaireNoir/blight).
 //!
 //! The latest version of the libary now supports [controlling LEDs][led] using the `/sys/class/leds` interface.
@@ -158,7 +158,43 @@ impl Device {
             Some(val) => val,
             None => Self::detect_device(BLDIR)?.into(),
         };
-        let info = utils::read_info(BLDIR, &name)?;
+        let info = utils::read_info(BLDIR, &name, None)?;
+        Ok(Device {
+            current: info.current,
+            max: info.max,
+            path: info.path,
+            name: name.into_owned(),
+            brightness: info.brightness,
+        })
+    }
+
+    /// Initialize a backlight [Device] with an exclusive lock on the brightness file
+    ///
+    /// By default, it uses the priority detection method unless ``Some(device_name)`` is passed as an argument, then that name will be used to create an instance of that device if it exists.
+    /// If `blocking` is set `true`, this call will block until an exclusive lock is acquired on the brightness file.
+    ///
+    /// # Errors
+    /// Possible errors that can result from this function include:
+    /// * [``ErrorKind::NotFound``]
+    /// * [``ErrorKind::ReadDir``]
+    /// * [``ErrorKind::ReadCurrent``]
+    /// * [``ErrorKind::ReadMax``]
+    /// * [``ErrorKind::LockError``]
+    #[cfg(feature = "locking")]
+    pub fn new_locked(name: Option<Cow<str>>, blocking: bool) -> Result<Device> {
+        let name = match name {
+            Some(val) => val,
+            None => Self::detect_device(BLDIR)?.into(),
+        };
+        let info = utils::read_info(
+            BLDIR,
+            &name,
+            Some(if blocking {
+                utils::Lock::Blocking
+            } else {
+                utils::Lock::NonBlocking
+            }),
+        )?;
         Ok(Device {
             current: info.current,
             max: info.max,
@@ -515,8 +551,15 @@ mod utils {
         pub(crate) path: PathBuf,
     }
 
+    #[allow(unused)]
+    #[derive(Clone, Copy)]
+    pub(crate) enum Lock {
+        NonBlocking,
+        Blocking,
+    }
+
     /// Read all the necessary info from the backlight/led interface directory
-    pub(crate) fn read_info(dir: &str, interface: &str) -> Result<Info> {
+    pub(crate) fn read_info(dir: &str, interface: &str, _lock: Option<Lock>) -> Result<Info> {
         let mut path = construct_path(dir, interface);
         if !path.is_dir() {
             return Err(ErrorKind::NotFound.into());
@@ -538,6 +581,10 @@ mod utils {
                 .write(true)
                 .open(&path)
                 .map_err(err.clone())?;
+            #[cfg(feature = "locking")]
+            if let Some(lock) = _lock {
+                acquire_lock(&mut current_file, lock)?;
+            }
             let current = read_ascii_u32(&mut current_file).map_err(err)?;
             (current, current_file)
         };
@@ -549,6 +596,26 @@ mod utils {
             brightness,
             path,
         })
+    }
+
+    #[cfg(feature = "locking")]
+    fn acquire_lock(file: &mut File, lock: Lock) -> Result<()> {
+        let lock_err = |blocked, src: Option<_>| {
+            let err = Error::from(ErrorKind::LockError { blocked });
+            if let Some(src) = src {
+                err.with_source(src)
+            } else {
+                err
+            }
+        };
+        match lock {
+            Lock::NonBlocking => match file.try_lock() {
+                Ok(_) => Ok(()),
+                Err(std::fs::TryLockError::WouldBlock) => Err(lock_err(true, None)),
+                Err(std::fs::TryLockError::Error(src)) => Err(lock_err(false, Some(src))),
+            },
+            Lock::Blocking => file.lock().map_err(|err| lock_err(false, Some(err))),
+        }
     }
 
     /// Try to read the ASCII contents from the source and convert them into a u32
@@ -602,7 +669,7 @@ mod tests {
     impl MockInterface {
         /// Reads from disk, for testing reads and writes
         fn new(name: &str) -> Self {
-            Self(utils::read_info(BLDIR, name).expect("failed to initialize mock interface"))
+            Self(utils::read_info(BLDIR, name, None).expect("failed to initialize mock interface"))
         }
         /// Dummy instance with specified values that points to an empty temp file
         ///
@@ -654,7 +721,7 @@ mod tests {
         let test = || {
             let utils::Info {
                 current, max, path, ..
-            } = utils::read_info(BLDIR, name).expect("failed to read info");
+            } = utils::read_info(BLDIR, name, None).expect("failed to read info");
 
             assert_eq!(current, 50, "incorrect current value");
             assert_eq!(max, 100, "incorrect max value");

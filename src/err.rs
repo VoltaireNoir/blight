@@ -62,13 +62,24 @@ impl std::error::Error for Error {
 /// The `Display` trait impl provides human-friendly, descriptive messages for each variant.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ErrorKind {
-    ReadDir { dir: &'static str },
+    ReadDir {
+        dir: &'static str,
+    },
     ReadMax,
     ReadCurrent,
-    WriteValue { device: String },
-    ValueTooLarge { given: u32, supported: u32 },
+    WriteValue {
+        device: String,
+    },
+    ValueTooLarge {
+        given: u32,
+        supported: u32,
+    },
     SweepError,
     NotFound,
+    #[cfg(feature = "locking")]
+    LockError {
+        blocked: bool,
+    },
 }
 
 impl std::fmt::Display for ErrorKind {
@@ -91,6 +102,14 @@ impl std::fmt::Display for ErrorKind {
                 f,
                 "provided value '{given}' is larger than the max supported value of '{supported}'"
             ),
+            #[cfg(feature = "locking")]
+            ErrorKind::LockError { blocked } => {
+                if *blocked {
+                    write!(f, "failed to acquire exclusive lock on the brightness file as it's already locked")
+                } else {
+                    write!(f, "failed to acquire exclusive lock on the brightness file")
+                }
+            }
         }
     }
 }

@@ -1,3 +1,5 @@
+#![cfg(feature = "cli")]
+
 use std::env;
 
 mod utils;
