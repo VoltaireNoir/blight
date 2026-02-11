@@ -379,7 +379,7 @@ impl PanicReporter {
             std::panic::set_hook(Box::new(Self::report));
         }
     }
-    fn report(info: &std::panic::PanicInfo) {
+    fn report(info: &std::panic::PanicHookInfo) {
         let tip = "This is unexpected behavior. Please report this issue at https://github.com/VoltaireNoir/blight/issues";
         let payload = info.payload();
         let cause = if let Some(pay) = payload.downcast_ref::<&str>() {
