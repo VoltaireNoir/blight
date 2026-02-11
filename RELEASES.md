@@ -4,6 +4,8 @@
 - library support for LED interface (`/sys/class/leds`) 🎉
 - `toggle` method to toggle between min and max supported brightness values
   - Mainly intended to be used for LEDs, but is also available on the `Device` type
+- `Device::new_locked` method to init a backlight device with an exclusive lock on the brightness file
+  - A method of the same name also exists for the `Led` type
 
 ### Improved
 - Better and cleaner implementation of the code that reads brightness values from ASCII text
@@ -11,6 +13,8 @@
 - All doc tests are set to `no_run` instead of `ignore`, to ensure all doc examples compile
 - All successful write operations update the `current` brightness value in `self`
   - This makes calling `reload` after a write optional and is required only if brightness values were modified by an external process
+- CLI deps are now behind a feature gate (enabled by default)
+  - library users are now recommended to use `cargo add --no-default-features`
 
 ### Changed
 - [BREAKING!] `sweep_write` returns `ErrorKind::ValueTooLarge` if the provided value is larger than `max` (same as `write_value`) instead of silently ignoring it
@@ -22,6 +26,8 @@
 - [BREAKING!] `device_path` method now returns a `&Path` instead of a `PathBuf`
 - `blight::Result` is now the preferred type alias for the result type, not `blight::BlResult`
  - The old type alias is still included
+- [BREAKING!] Migrated from `fs4` to std lib based file locking for CLI
+  - This raises the MSRV to `1.89.0` (only for CLI and lib users with `locking` feature enabled)
 
 # Version 0.7.1
 

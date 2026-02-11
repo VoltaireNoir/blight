@@ -4,15 +4,7 @@ use blight::{
     Light, BLDIR,
 };
 use colored::Colorize;
-use fs4::FileExt;
-use std::{
-    borrow::Cow,
-    env,
-    env::Args,
-    fs::{self, File, OpenOptions},
-    iter::Skip,
-    path::PathBuf,
-};
+use std::{borrow::Cow, env, env::Args, fs, iter::Skip, path::PathBuf};
 
 mod setup;
 
@@ -123,12 +115,22 @@ pub fn execute(conf: Config) -> Result<SuccessMessage, DynError> {
         Save => save(conf.options.device)?,
         Restore => restore()?,
         Set(v) => {
-            let _lock = acquire_lock()?;
-            blight::set_bl(v, conf.options.device)?
+            // Same impl as blight::set_bl but with file locking
+            let mut device = new_locked(conf.options.device)?;
+            if v != device.current() {
+                device.write_value(v)?;
+            }
         }
         Adjust { dir, value } => {
-            let _lock = acquire_lock()?;
-            blight::change_bl(value, conf.options.sweep, dir, conf.options.device)?
+            // Same impl as blight::change_bl but with file locking
+            let mut device = new_locked(conf.options.device)?;
+            let change = device.calculate_change(value, dir);
+            if change != device.current() {
+                match conf.options.sweep {
+                    Change::Sweep => device.sweep_write(change, blight::Delay::default())?,
+                    Change::Regular => device.write_value(change)?,
+                }
+            }
         }
     };
 
@@ -149,7 +151,6 @@ pub enum BlightError {
     ReadFromSave(std::io::Error),
     NoSaveFound,
     SaveParseErr,
-    LockFailure(std::io::Error),
 }
 
 impl Tip for BlightError {
@@ -164,9 +165,6 @@ impl Tip for BlightError {
             }
             ReadFromSave(_) => Some("make sure you have read permission for the save file".into()),
             SaveParseErr => Some("delete the save file and try save-restore again".into()),
-            LockFailure(_) => {
-                Some(format!("try manually removing the lock file: `{LOCKFILE}`").into())
-            }
             _ => None,
         }
     }
@@ -184,7 +182,6 @@ impl std::fmt::Display for BlightError {
             ReadFromSave(err) => write!(f, "failed to read from save file\n{err}"),
             NoSaveFound => write!(f, "no save file found"),
             SaveParseErr => write!(f, "failed to parse saved brightness value"),
-            LockFailure(err) => write!(f, "failed to acquire lock\n{err}"),
         }
     }
 }
@@ -193,7 +190,7 @@ impl std::error::Error for BlightError {}
 
 impl Tip for blight::Error {
     fn tip(&self) -> Option<Cow<'static, str>> {
-        use blight::ErrorKind::WriteValue;
+        use blight::ErrorKind::{LockError, WriteValue};
         match self.kind() {
             WriteValue { device } => {
                 let tip_msg = format!(
@@ -206,6 +203,9 @@ or visit https://wiki.archlinux.org/title/Backlight#Hardware_interfaces
 if you'd like to do it manually.",
                 );
                 Some(tip_msg.into())
+            }
+            LockError { .. } => {
+                Some(format!("try manually removing the lock file: `{LOCKFILE}`").into())
             }
             _ => None,
         }
@@ -379,7 +379,7 @@ impl PanicReporter {
             std::panic::set_hook(Box::new(Self::report));
         }
     }
-    fn report(info: &std::panic::PanicInfo) {
+    fn report(info: &std::panic::PanicHookInfo) {
         let tip = "This is unexpected behavior. Please report this issue at https://github.com/VoltaireNoir/blight/issues";
         let payload = info.payload();
         let cause = if let Some(pay) = payload.downcast_ref::<&str>() {
@@ -398,20 +398,17 @@ impl PanicReporter {
     }
 }
 
-fn acquire_lock() -> Result<File, DynError> {
-    let file = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .open(LOCKFILE)
-        .map_err(BlightError::LockFailure)?;
-    if file.try_lock_exclusive().is_ok() {
-        return Ok(file);
-    }
-    println!(
-        "{} {}",
-        "Status".magenta().bold(),
-        "Waiting for another instance to finish"
-    );
-    file.lock_exclusive().map_err(BlightError::LockFailure)?;
-    Ok(file)
+fn new_locked(name: Option<Cow<str>>) -> Result<Device, DynError> {
+    let device = match Device::new_locked(name.clone(), false) {
+        Err(err) if *err.kind() == blight::ErrorKind::LockError { blocked: true } => {
+            println!(
+                "{} Waiting for another instance to finish",
+                "Status".magenta().bold(),
+            );
+            Device::new_locked(name, true)
+        }
+        other => other,
+    }?;
+
+    Ok(device)
 }

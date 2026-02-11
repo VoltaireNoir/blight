@@ -111,20 +111,45 @@ impl Led<()> {
     /// is in accordance with the device naming convention described in <https://www.kernel.org/doc/html/latest/leds/leds-class.html#led-device-naming>.
     ///
     /// # Errors
-    /// - `NotFound` - an LED dir of the given name is not found
-    /// - `ReadMax` - failure to read the max brightness value
-    /// - `ReadCurrent` - failure to read the current brightness value
+    /// - [`ErrorKind::NotFound`] - an LED dir of the given name is not found
+    /// - [`ErrorKind::ReadMax`] - failure to read the max brightness value
+    /// - [`ErrorKind::ReadCurrent`] - failure to read the current brightness value
     pub fn new(name: Cow<str>) -> crate::Result<LedType> {
-        Self::new_inner(LedName::parse(name))
+        Self::new_inner(LedName::parse(name), None)
     }
 
-    fn new_inner(name: LedName) -> crate::Result<LedType> {
+    /// Create a new instance of an Led with an exclusive lock on the brightness file
+    ///
+    /// An instance will be created only if an LED of the provided name exists and the max and current brightness values are successfully read.
+    /// If `blocking` is set `true`, this call will block until an exclusive lock is acquired on the brightness file.
+    ///
+    /// Note: The initialized Led will only contain additional `function` and `color` information if the name of the LED
+    /// is in accordance with the device naming convention described in <https://www.kernel.org/doc/html/latest/leds/leds-class.html#led-device-naming>.
+    ///
+    /// # Errors
+    /// - [`ErrorKind::NotFound`] - an LED dir of the given name is not found
+    /// - [`ErrorKind::ReadMax`] - failure to read the max brightness value
+    /// - [`ErrorKind::ReadCurrent`] - failure to read the current brightness value
+    /// - [`ErrorKind::LockError`] - failure to acquire an exclusive file lock
+    #[cfg(feature = "locking")]
+    pub fn new_locked(name: Cow<str>, blocking: bool) -> crate::Result<LedType> {
+        Self::new_inner(
+            LedName::parse(name),
+            Some(if blocking {
+                utils::Lock::Blocking
+            } else {
+                utils::Lock::NonBlocking
+            }),
+        )
+    }
+
+    fn new_inner(name: LedName, lock: Option<utils::Lock>) -> crate::Result<LedType> {
         let utils::Info {
             current,
             max,
             brightness,
             path,
-        } = utils::read_info(LEDDIR, &name.raw)?;
+        } = utils::read_info(LEDDIR, &name.raw, lock)?;
         #[allow(clippy::cast_possible_truncation)]
         let (max, current) = (max as _, current as _);
         let name = name.into_owned();
@@ -163,7 +188,7 @@ impl Led<()> {
     /// - `ReadMax` - failure to read the max brightness value
     /// - `ReadCurrent` - failure to read the current brightness value
     pub fn from_name(name: LedName) -> crate::Result<LedType> {
-        Self::new_inner(name)
+        Self::new_inner(name, None)
     }
 }
 

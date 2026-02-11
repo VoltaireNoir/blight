@@ -12,8 +12,17 @@ exclude = ["*.png", ".github/workflows"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
-colored = "2.0.3"
-fs4 = { version = "0.6.6", features = ["sync"] }
+colored = { version = "2.0.3", optional = true }
+
+[features]
+default = ["cli"]
+locking = []
+cli = ["locking", "dep:colored"]
+
+[[bin]]
+name = "blight"
+path = "src/main.rs"
+required-features = ["cli"]
 
 [profile.release]
 strip = true
