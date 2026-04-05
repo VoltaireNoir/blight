@@ -1,8 +1,7 @@
 # blight
 <div align="center">
 
-![Generated using Dall-E 2](blightm.png)
-*(Credits: Sneha Sundar, for generating this lovely image for blight using DALL·E 2)*
+![](blight.jpg)
 
 [![Rust](https://github.com/VoltaireNoir/blight/actions/workflows/rust.yml/badge.svg)](https://github.com/VoltaireNoir/blight/actions/workflows/rust.yml)
 [![Crates.io](https://img.shields.io/crates/v/blight)](https://crates.io/crates/blight)
