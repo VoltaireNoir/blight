@@ -12,8 +12,14 @@ use std::{
     process,
 };
 
-const RULES: &str = r#"ACTION=="add", SUBSYSTEM=="backlight", RUN+="/bin/chgrp video /sys/class/backlight/%k/brightness"
-ACTION=="add", SUBSYSTEM=="backlight", RUN+="/bin/chmod g+w /sys/class/backlight/%k/brightness""#;
+const RULES: &str = r#"# Backlight controls
+ACTION=="add", SUBSYSTEM=="backlight", RUN+="/bin/chgrp video /sys/class/backlight/%k/brightness"
+ACTION=="add", SUBSYSTEM=="backlight", RUN+="/bin/chmod g+w /sys/class/backlight/%k/brightness"
+
+# LED controls
+ACTION=="add", SUBSYSTEM=="leds", RUN+="/bin/chgrp video /sys/class/leds/%k/brightness"
+ACTION=="add", SUBSYSTEM=="leds", RUN+="/bin/chmod g+w /sys/class/leds/%k/brightness""#;
+
 const UDEVFILE: &str = "/lib/udev/rules.d/90-blight.rules";
 
 /// The function runs the setup. The udev file 90-blight.rules is placed in /lib/udev/.udev.rules.d/.
@@ -22,9 +28,9 @@ pub fn run() {
     println!("{}", "Running Setup".bold());
     print!("UDEV Rules: ");
     match setup_rules() {
-        RulesResult::Ok => println!("{}", "Ok".green()),
-        RulesResult::Exists => println!("{}", "Ok (already in place)".green()),
-        RulesResult::Err(err) => {
+        Ok(RulesStatus::WriteOk) => println!("{}", "Ok".green()),
+        Ok(RulesStatus::AlreadyExists) => println!("{}", "Ok (already in place)".green()),
+        Err(err) => {
             if err.kind() == ErrorKind::PermissionDenied {
                 println!("{}", "Failed. Run `blight setup` with sudo.".red())
             } else {
@@ -47,21 +53,18 @@ pub fn run() {
     );
 }
 
-enum RulesResult {
-    Ok,
-    Exists,
-    Err(std::io::Error),
+enum RulesStatus {
+    WriteOk,
+    AlreadyExists,
 }
 
-fn setup_rules() -> RulesResult {
+fn setup_rules() -> std::io::Result<RulesStatus> {
     let path = PathBuf::from(UDEVFILE);
-    if path.exists() && fs::read_to_string(&path).unwrap().contains(RULES) {
-        return RulesResult::Exists;
+    if path.exists() && fs::read_to_string(&path)? == RULES {
+        return Ok(RulesStatus::AlreadyExists);
     }
-    if let Err(err) = fs::write(UDEVFILE, RULES) {
-        return RulesResult::Err(err);
-    }
-    RulesResult::Ok
+    fs::write(UDEVFILE, RULES)?;
+    Ok(RulesStatus::WriteOk)
 }
 
 enum GroupResult {
