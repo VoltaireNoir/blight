@@ -43,6 +43,7 @@ compile_error!("blight is only supported on linux");
 
 use std::{
     borrow::Cow,
+    fmt::{Debug, Display},
     fs::{self, File},
     io::prelude::*,
     ops::Deref,
@@ -286,7 +287,7 @@ pub trait Toggleable: private::Sealed {}
 
 /// The interface for controlling both backlight and LED devices
 pub trait Light: private::Sealed {
-    type Value: Into<u32> + TryFrom<u32> + PartialEq + Copy + Default;
+    type Value: Into<u32> + TryFrom<u32> + PartialEq + Copy + Default + Display + Debug;
 
     /// Name of the backlight/LED device
     fn name(&self) -> &str;
