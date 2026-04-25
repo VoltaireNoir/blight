@@ -2,21 +2,21 @@
 
 use std::env;
 
-mod utils;
+mod cli;
 
 fn main() {
-    utils::PanicReporter::init();
+    cli::PanicReporter::init();
 
-    let config = match utils::parse(env::args().skip(1)) {
+    let config = match cli::parse(env::args().skip(1)) {
         Ok(c) => c,
         Err(e) => {
-            utils::print_err(e);
+            cli::print_err(e);
             return;
         }
     };
 
-    match utils::execute(config) {
-        Err(e) => utils::print_err(e),
-        Ok(msg) => utils::print_ok(msg),
+    match cli::execute(config) {
+        Err(e) => cli::print_err(e),
+        Ok(msg) => cli::print_ok(msg),
     }
 }
