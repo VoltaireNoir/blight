@@ -8,7 +8,7 @@ repository = "https://github.com/VoltaireNoir/blight"
 license = "MIT"
 version = "0.7.1"
 edition = "2021"
-exclude = ["*.png", "*.jpg", ".github/workflows"]
+exclude = ["*.png", "*.jpg", "*.gif", "demo.tape", ".github/workflows"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
