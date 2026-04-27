@@ -586,15 +586,15 @@ pub fn print_devices() {
 pub fn print_help() {
     let title = "blight: A backlight utility for Linux that plays well with hybrid GPUs";
     let quote = "\"And man said, \'let there b-light\' and there was light.\" - Some Book 1:3";
-    let flags = "Flags: sweep [--sweep, -s], dev [--device <name>, -d <name>]
-    Sweep flag lets you increase brightness gradually, resulting in a smooth change.
-    Dev (short for device) flag lets you specify a backlight device target other than the default one.";
+    let flags = "Flags: sweep [--sweep, -s] Opts: device [--device <name>, -d <name>]
+    Sweep lets you increase brightness gradually, resulting in a smooth change.
+    Device lets you specify a backlight device target other than the default one.";
     let commands: String = [
-        ("inc [val] [flags: dev, sweep]", "-> increase brightness"),
-        ("dec [val] [flags: dev, sweep]", "-> decrease brightness"),
-        ("set [val] [flags: dev]", "-> set custom brightness value"),
+        ("inc <val> [flags: sweep] [opts: device]", "-> increase brightness"),
+        ("dec <val> [flags: sweep] [opts: device]", "-> decrease brightness"),
+        ("set <val> [opts: device]", "-> set custom brightness value"),
         (
-            "save [flags: dev]",
+            "save [opts: device]",
             "-> save current brightness value to restore later",
         ),
         ("restore", "-> restore saved brightness value\n"),
@@ -631,9 +631,9 @@ Examples:
 
 pub fn print_shelp() {
     let cc: String = [
-        ("inc [val]", "-> increase brightness by given value"),
-        ("dec [val]", "-> decrease brightness by given value"),
-        ("set [val]", "-> set custom brightness value"),
+        ("inc <val>", "-> increase brightness by given value"),
+        ("dec <val>", "-> decrease brightness by given value"),
+        ("set <val>", "-> set custom brightness value"),
         ("status", "-> show backlight device info"),
         ("setup", "-> gain write permission to brightness file"),
     ]
