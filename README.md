@@ -59,5 +59,4 @@ Set custom shortcuts using your distro settings or pair it with a hotkey daemon 
 - `cargo build -r`
 
 ## Contribute
-Coding, for me, is a hobby and I'm very much new to Rust and to programming as a whole. So if you notice anything in the code that can be improved, do open an issue to voice your opinion and pass on your suggestions. If you want to improve the code directly, please raise a pull-request, I'd be happy to collaborate and work to improve this together. Cheers!
-
+All contributions are welcome and appreciated. Want to implement a new feature or have a feature request? Create an issue. If you've implemented it already and think it is a meaningful addition, it is perfectly fine to create a PR directly. Cheers 🍻
