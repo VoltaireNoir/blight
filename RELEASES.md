@@ -2,6 +2,9 @@
 
 ### Added
 - library support for LED interface (`/sys/class/leds`) 🎉
+- LED support in CLI 🎉
+- Updated `blight setup` script with additional udev rules to allow user to modify LED brightness files
+  - *RECOMMENDED*: run `sudo blight setup` again after updating to the latest version, for LED functionality to work.
 - `toggle` method to toggle between min and max supported brightness values
   - Mainly intended to be used for LEDs, but is also available on the `Device` type
 - `Device::new_locked` method to init a backlight device with an exclusive lock on the brightness file

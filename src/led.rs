@@ -588,12 +588,36 @@ pub fn leds_from_names<'a>(
 
 /// Helper function to turn an LED on/off
 ///
-/// `State`: true = on, false = off
+/// `State`: true = on (brightness = max), false = off (brightness = 0)
 ///
 /// # Errors
 /// - All possible errors returned by [`Led::new`] and [`Light::write_value`]
 pub fn set_led_state(led_name: &str, state: bool) -> crate::Result<()> {
-    let value = u8::from(state);
+    match Led::new(led_name.into())? {
+        LedType::Dimmable(mut led) => led.write_value(if state { led.max() } else { 0 }),
+        LedType::NonDimmable(mut led) => led.write_value(u8::from(state)),
+    }
+}
+
+/// Helper function to get LED state
+///
+/// `State`: true = on (brightness != 0), false = off (brightness == 0)
+///
+/// # Errors
+/// - All possible errors returned by [`Led::new`]
+pub fn get_led_state(led_name: &str) -> crate::Result<bool> {
+    let state = match Led::new(led_name.into())? {
+        LedType::Dimmable(led) => led.current(),
+        LedType::NonDimmable(led) => led.current(),
+    };
+    Ok(state != 0)
+}
+
+/// Helper function to set LED brightness value
+///
+/// # Errors
+/// - All possible errors returned by [`Led::new`] and [`Led::write_value`]
+pub fn set_led_value(led_name: &str, value: u8) -> crate::Result<()> {
     match Led::new(led_name.into())? {
         LedType::Dimmable(mut led) => led.write_value(value),
         LedType::NonDimmable(mut led) => led.write_value(value),
@@ -727,6 +751,48 @@ mod tests {
         set_led_state(name, false).expect("failed to turn off LED");
         led.reload();
         assert_eq!(led.current(), 0, "LED is not turned off");
+        clean_up();
+    }
+
+    #[test]
+    fn get_state_on() {
+        clean_up();
+        let name = "generic";
+        setup_test_env(&[name], 1, 1);
+        assert!(
+            super::get_led_state(name).unwrap(),
+            "led state should return true, but returned false"
+        );
+        clean_up();
+    }
+
+    #[test]
+    fn get_state_off() {
+        clean_up();
+        let name = "generic";
+        setup_test_env(&[name], 0, 1);
+        assert!(
+            !super::get_led_state(name).unwrap(),
+            "led state should return false, but returned true"
+        );
+        clean_up();
+    }
+
+    #[test]
+    fn set_value() {
+        clean_up();
+        let name = "generic";
+        setup_test_env(&[name], 0, 255);
+        let LedType::Dimmable(mut led) = Led::new(name.into()).expect("failed to initialize LED")
+        else {
+            unreachable!()
+        };
+        let values = [0, 1, 2, 3, u8::MAX];
+        for val in values {
+            set_led_value(name, val).expect("failed to set led value");
+            led.reload();
+            assert_eq!(led.current(), val);
+        }
         clean_up();
     }
 }
