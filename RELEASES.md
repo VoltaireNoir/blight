@@ -1,4 +1,4 @@
-# Version 0.8.0 (unreleased)
+# Version 0.8.0
 
 ### Added
 - library support for LED interface (`/sys/class/leds`) 🎉
@@ -29,8 +29,17 @@
 - [BREAKING!] `device_path` method now returns a `&Path` instead of a `PathBuf`
 - `blight::Result` is now the preferred type alias for the result type, not `blight::BlResult`
  - The old type alias is still included
-- [BREAKING!] Migrated from `fs4` to std lib based file locking for CLI
-  - This raises the MSRV to `1.89.0` (only for CLI and lib users with `locking` feature enabled)
+- [BREAKING!] Migrated from `fs4` to std lib based file locking (feature gated under `locking`)
+  - Read the below `MSRV` section for details
+
+### Note on MSRV
+The minimum supported Rust version depends on how you use this crate.
+- Binary with `cli` feature (required) enabled: MSRV = `1.95.0` 
+  - `cargo msrv find` or `cargo msrv find -- cargo check --bin blight`
+- Library with `locking` feature enabled: MSRV = `1.89.0`
+  - `cargo msrv find -- cargo check --lib --no-default features --features locking`
+- Library with all features disabled: MSRV = `1.82.0`
+  - `cargo msrv find -- cargo check --lib --no-default features`
 
 # Version 0.7.1
 
